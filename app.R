@@ -295,7 +295,7 @@ ui <- page_navbar(
         selectInput("plot_type", NULL,
           choices = c(
             "Taxonomía (barras)"  = "taxonomy_bar",
-            "Taxonomía (pie)"     = "taxonomy_pie",
+
             "Funciones COG"       = "func_cog",
             "Funciones KEGG"      = "func_kegg",
             "Funciones PFAM"      = "func_pfam",
@@ -449,7 +449,7 @@ server <- function(input, output, session) {
       "Family" = "family", "Genus" = "genus", "Species" = "species"
     )
 
-    if (pt %in% c("taxonomy_bar", "taxonomy_pie")) {
+
       tagList(
         tags$div(class = "form-label", "Rango taxonómico"),
         selectInput("tax_rank", NULL, choices = rank_choices),
@@ -473,7 +473,7 @@ server <- function(input, output, session) {
     pt   <- input$plot_type
 
     if      (pt == "taxonomy_bar") plotTaxonomy(proj,  rank = input$tax_rank, N = input$n_taxa)
-    else if (pt == "taxonomy_pie") plotTaxonomy(proj,  rank = input$tax_rank, N = input$n_taxa, type = "pie")
+
     else if (pt == "func_cog")     plotFunctions(proj, fun_level = "COG",  N = input$n_funcs)
     else if (pt == "func_kegg")    plotFunctions(proj, fun_level = "KEGG", N = input$n_funcs)
     else if (pt == "func_pfam")    plotFunctions(proj, fun_level = "PFAM", N = input$n_funcs)
