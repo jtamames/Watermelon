@@ -337,6 +337,1351 @@ avail_fun_metrics <- function(proj, db) {
              "Copy number (copy_number)" = "copy_number")
   Filter(function(m) tryCatch(has_data(proj$functions[[db]][[m]]), error=function(e) FALSE), all_m)
 }
+  c(
+    "2-Oxocarboxylic acid metabolism [01210]" = "01210",
+    "ABC transporters [02010]" = "02010",
+    "AMPK signaling pathway [04152]" = "04152",
+    "Acarbose and validamycin biosynthesis [00525]" = "00525",
+    "Acridone alkaloid biosynthesis [01058]" = "01058",
+    "Acute myeloid leukemia [05221]" = "05221",
+    "Adherens junction [04520]" = "04520",
+    "Adipocytokine signaling pathway [04920]" = "04920",
+    "Adrenergic signaling in cardiomyocytes [04261]" = "04261",
+    "African trypanosomiasis [05143]" = "05143",
+    "Alanine, aspartate and glutamate metabolism [00250]" = "00250",
+    "Alcoholism [05034]" = "05034",
+    "Aldosterone-regulated sodium reabsorption [04960]" = "04960",
+    "Allograft rejection [05330]" = "05330",
+    "Alzheimer disease [05010]" = "05010",
+    "Amino sugar and nucleotide sugar metabolism [00520]" = "00520",
+    "Aminoacyl-tRNA biosynthesis [00970]" = "00970",
+    "Aminobenzoate degradation [00627]" = "00627",
+    "Amoebiasis [05146]" = "05146",
+    "Amphetamine addiction [05031]" = "05031",
+    "Amyotrophic lateral sclerosis [05014]" = "05014",
+    "Antigen processing and presentation [04612]" = "04612",
+    "Apelin signaling pathway [04371]" = "04371",
+    "Apoptosis [04210]" = "04210",
+    "Apoptosis - fly [04214]" = "04214",
+    "Apoptosis - multiple species [04215]" = "04215",
+    "Arabinogalactan biosynthesis - Mycobacterium [00572]" = "00572",
+    "Arachidonic acid metabolism [00590]" = "00590",
+    "Arginine and proline metabolism [00330]" = "00330",
+    "Arginine biosynthesis [00220]" = "00220",
+    "Arrhythmogenic right ventricular cardiomyopathy [05412]" = "05412",
+    "Ascorbate and aldarate metabolism [00053]" = "00053",
+    "Asthma [05310]" = "05310",
+    "Atrazine degradation [00791]" = "00791",
+    "Autoimmune thyroid disease [05320]" = "05320",
+    "Autophagy - animal [04140]" = "04140",
+    "Autophagy - other [04136]" = "04136",
+    "Autophagy - yeast [04138]" = "04138",
+    "Axon guidance [04360]" = "04360",
+    "B cell receptor signaling pathway [04662]" = "04662",
+    "Bacterial invasion of epithelial cells [05100]" = "05100",
+    "Bacterial secretion system [03070]" = "03070",
+    "Basal cell carcinoma [05217]" = "05217",
+    "Basal transcription factors [03022]" = "03022",
+    "Base excision repair [03410]" = "03410",
+    "Benzoate degradation [00362]" = "00362",
+    "Bile secretion [04976]" = "04976",
+    "Biofilm formation - Escherichia coli [05112]" = "05112",
+    "Biofilm formation - Pseudomonas aeruginosa [05113]" = "05113",
+    "Biofilm formation - Vibrio cholerae [05111]" = "05111",
+    "Biosynthesis of 12-, 14- and 16-membered macrolides [00522]" = "00522",
+    "Biosynthesis of alkaloids derived from histidine and purine [01065]" = "01065",
+    "Biosynthesis of alkaloids derived from ornithine, lysine and nicotinic acid [01064]" = "01064",
+    "Biosynthesis of alkaloids derived from shikimate pathway [01063]" = "01063",
+    "Biosynthesis of alkaloids derived from terpenoid and polyketide [01066]" = "01066",
+    "Biosynthesis of amino acids [01230]" = "01230",
+    "Biosynthesis of ansamycins [01051]" = "01051",
+    "Biosynthesis of cofactors [01240]" = "01240",
+    "Biosynthesis of enediyne antibiotics [01059]" = "01059",
+    "Biosynthesis of nucleotide sugars [01250]" = "01250",
+    "Biosynthesis of phenylpropanoids [01061]" = "01061",
+    "Biosynthesis of plant hormones [01070]" = "01070",
+    "Biosynthesis of plant secondary metabolites [01060]" = "01060",
+    "Biosynthesis of secondary metabolites [01110]" = "01110",
+    "Biosynthesis of siderophore group nonribosomal peptides [01053]" = "01053",
+    "Biosynthesis of terpenoids and steroids [01062]" = "01062",
+    "Biosynthesis of type II polyketide backbone [01056]" = "01056",
+    "Biosynthesis of type II polyketide products [01057]" = "01057",
+    "Biosynthesis of unsaturated fatty acids [01040]" = "01040",
+    "Biosynthesis of vancomycin group antibiotics [01055]" = "01055",
+    "Biotin metabolism [00780]" = "00780",
+    "Bisphenol degradation [00363]" = "00363",
+    "Bladder cancer [05219]" = "05219",
+    "Brassinosteroid biosynthesis [00905]" = "00905",
+    "Breast cancer [05224]" = "05224",
+    "Butanoate metabolism [00650]" = "00650",
+    "C-type lectin receptor signaling pathway [04625]" = "04625",
+    "C5-Branched dibasic acid metabolism [00660]" = "00660",
+    "Caffeine metabolism [00232]" = "00232",
+    "Calcium signaling pathway [04020]" = "04020",
+    "Cannabinoid addiction [05035]" = "05035",
+    "Caprolactam degradation [00930]" = "00930",
+    "Carbapenem biosynthesis [00332]" = "00332",
+    "Carbohydrate digestion and absorption [04973]" = "04973",
+    "Carbon fixation in photosynthetic organisms [00710]" = "00710",
+    "Carbon fixation pathways in prokaryotes [00720]" = "00720",
+    "Carbon metabolism [01200]" = "01200",
+    "Cardiac muscle contraction [04260]" = "04260",
+    "Carotenoid biosynthesis [00906]" = "00906",
+    "Cell adhesion molecules [04514]" = "04514",
+    "Cell cycle [04110]" = "04110",
+    "Cell cycle - Caulobacter [04112]" = "04112",
+    "Cell cycle - yeast [04111]" = "04111",
+    "Cellular senescence [04218]" = "04218",
+    "Central carbon metabolism in cancer [05230]" = "05230",
+    "Chagas disease [05142]" = "05142",
+    "Chemical carcinogenesis - DNA adducts [05204]" = "05204",
+    "Chemical carcinogenesis - reactive oxygen species [05208]" = "05208",
+    "Chemical carcinogenesis - receptor activation [05207]" = "05207",
+    "Chemokine signaling pathway [04062]" = "04062",
+    "Chloroalkane and chloroalkene degradation [00625]" = "00625",
+    "Chlorocyclohexane and chlorobenzene degradation [00361]" = "00361",
+    "Cholesterol metabolism [04979]" = "04979",
+    "Choline metabolism in cancer [05231]" = "05231",
+    "Cholinergic synapse [04725]" = "04725",
+    "Chronic myeloid leukemia [05220]" = "05220",
+    "Circadian entrainment [04713]" = "04713",
+    "Circadian rhythm [04710]" = "04710",
+    "Circadian rhythm - fly [04711]" = "04711",
+    "Circadian rhythm - plant [04712]" = "04712",
+    "Citrate cycle (TCA cycle) [00020]" = "00020",
+    "Clavulanic acid biosynthesis [00331]" = "00331",
+    "Cocaine addiction [05030]" = "05030",
+    "Collecting duct acid secretion [04966]" = "04966",
+    "Colorectal cancer [05210]" = "05210",
+    "Complement and coagulation cascades [04610]" = "04610",
+    "Coronavirus disease - COVID-19 [05171]" = "05171",
+    "Cutin, suberine and wax biosynthesis [00073]" = "00073",
+    "Cyanoamino acid metabolism [00460]" = "00460",
+    "Cysteine and methionine metabolism [00270]" = "00270",
+    "Cytokine-cytokine receptor interaction [04060]" = "04060",
+    "Cytosolic DNA-sensing pathway [04623]" = "04623",
+    "D-Alanine metabolism [00473]" = "00473",
+    "D-Arginine and D-ornithine metabolism [00472]" = "00472",
+    "D-Glutamine and D-glutamate metabolism [00471]" = "00471",
+    "DNA replication [03030]" = "03030",
+    "Degradation of aromatic compounds [01220]" = "01220",
+    "Diabetic cardiomyopathy [05415]" = "05415",
+    "Dilated cardiomyopathy [05414]" = "05414",
+    "Dioxin degradation [00621]" = "00621",
+    "Diterpenoid biosynthesis [00904]" = "00904",
+    "Dopaminergic synapse [04728]" = "04728",
+    "ECM-receptor interaction [04512]" = "04512",
+    "Endocrine and other factor-regulated calcium reabsorption [04961]" = "04961",
+    "Endocytosis [04144]" = "04144",
+    "Endometrial cancer [05213]" = "05213",
+    "Epithelial cell signaling in Helicobacter pylori infection [05120]" = "05120",
+    "Epstein-Barr virus infection [05169]" = "05169",
+    "ErbB signaling pathway [04012]" = "04012",
+    "Ether lipid metabolism [00565]" = "00565",
+    "Ethylbenzene degradation [00642]" = "00642",
+    "Exopolysaccharide biosynthesis [00543]" = "00543",
+    "Fanconi anemia pathway [03460]" = "03460",
+    "Fat digestion and absorption [04975]" = "04975",
+    "Fatty acid biosynthesis [00061]" = "00061",
+    "Fatty acid degradation [00071]" = "00071",
+    "Fatty acid elongation [00062]" = "00062",
+    "Fatty acid metabolism [01212]" = "01212",
+    "Fc epsilon RI signaling pathway [04664]" = "04664",
+    "Fc gamma R-mediated phagocytosis [04666]" = "04666",
+    "Ferroptosis [04216]" = "04216",
+    "Ferroptosis [04716]" = "04716",
+    "Fluid shear stress and atherosclerosis [05418]" = "05418",
+    "Fluorobenzoate degradation [00364]" = "00364",
+    "Focal adhesion [04510]" = "04510",
+    "Folate biosynthesis [00790]" = "00790",
+    "FoxO signaling pathway [04068]" = "04068",
+    "Fructose and mannose metabolism [00051]" = "00051",
+    "GABAergic synapse [04727]" = "04727",
+    "Galactose metabolism [00052]" = "00052",
+    "Gap junction [04540]" = "04540",
+    "Gastric acid secretion [04971]" = "04971",
+    "Gastric cancer [05226]" = "05226",
+    "Geraniol degradation [00281]" = "00281",
+    "Glioma [05214]" = "05214",
+    "Glutamatergic synapse [04724]" = "04724",
+    "Glutathione metabolism [00480]" = "00480",
+    "Glycerolipid metabolism [00561]" = "00561",
+    "Glycerophospholipid metabolism [00564]" = "00564",
+    "Glycine, serine and threonine metabolism [00260]" = "00260",
+    "Glycolysis / Gluconeogenesis [00010]" = "00010",
+    "Glycosaminoglycan biosynthesis - chondroitin sulfate / dermatan sulfate [00532]" = "00532",
+    "Glycosaminoglycan biosynthesis - heparan sulfate / heparin [00534]" = "00534",
+    "Glycosaminoglycan biosynthesis - keratan sulfate [00533]" = "00533",
+    "Glycosaminoglycan degradation [00531]" = "00531",
+    "Glycosphingolipid biosynthesis - ganglio series [00604]" = "00604",
+    "Glycosphingolipid biosynthesis - globo and isoglobo series [00603]" = "00603",
+    "Glycosphingolipid biosynthesis - lacto and neolacto series [00601]" = "00601",
+    "Glycosylphosphatidylinositol (GPI)-anchor biosynthesis [00563]" = "00563",
+    "Glyoxylate and dicarboxylate metabolism [00630]" = "00630",
+    "Graft-versus-host disease [05332]" = "05332",
+    "HIF-1 signaling pathway [04066]" = "04066",
+    "Hedgehog signaling pathway [04340]" = "04340",
+    "Hedgehog signaling pathway - fly [04341]" = "04341",
+    "Hematopoietic cell lineage [04640]" = "04640",
+    "Hepatitis B [05161]" = "05161",
+    "Hepatitis C [05160]" = "05160",
+    "Hepatocellular carcinoma [05225]" = "05225",
+    "Herpes simplex virus 1 infection [05168]" = "05168",
+    "Hippo signaling pathway [04390]" = "04390",
+    "Hippo signaling pathway - fly [04391]" = "04391",
+    "Hippo signaling pathway - multiple species [04392]" = "04392",
+    "Histidine metabolism [00340]" = "00340",
+    "Homologous recombination [03440]" = "03440",
+    "Human T-cell leukemia virus 1 infection [05166]" = "05166",
+    "Human cytomegalovirus infection [05163]" = "05163",
+    "Human immunodeficiency virus 1 infection [05170]" = "05170",
+    "Human papillomavirus infection [05165]" = "05165",
+    "Huntington disease [05016]" = "05016",
+    "Hypertrophic cardiomyopathy [05410]" = "05410",
+    "IL-17 signaling pathway [04657]" = "04657",
+    "Inflammatory bowel disease [05321]" = "05321",
+    "Inflammatory mediator regulation of TRP channels [04750]" = "04750",
+    "Influenza A [05164]" = "05164",
+    "Inositol phosphate metabolism [00562]" = "00562",
+    "Insect hormone biosynthesis [00981]" = "00981",
+    "Insulin signaling pathway [04910]" = "04910",
+    "JAK-STAT signaling pathway [04630]" = "04630",
+    "Kaposi sarcoma-associated herpesvirus infection [05167]" = "05167",
+    "Legionellosis [05134]" = "05134",
+    "Leishmaniasis [05140]" = "05140",
+    "Leishmaniasis [05148]" = "05148",
+    "Leukocyte transendothelial migration [04670]" = "04670",
+    "Limonene and pinene degradation [00903]" = "00903",
+    "Linoleic acid metabolism [00591]" = "00591",
+    "Lipoarabinomannan (LAM) biosynthesis [00571]" = "00571",
+    "Lipoic acid metabolism [00785]" = "00785",
+    "Lipopolysaccharide biosynthesis [00540]" = "00540",
+    "Long-term depression [04730]" = "04730",
+    "Long-term potentiation [04720]" = "04720",
+    "Longevity regulating pathway [04211]" = "04211",
+    "Longevity regulating pathway - multiple species [04213]" = "04213",
+    "Longevity regulating pathway - worm [04212]" = "04212",
+    "Lysine biosynthesis [00300]" = "00300",
+    "Lysine degradation [00310]" = "00310",
+    "Lysosome [04142]" = "04142",
+    "MAPK signaling pathway [04010]" = "04010",
+    "MAPK signaling pathway - fly [04013]" = "04013",
+    "MAPK signaling pathway - plant [04016]" = "04016",
+    "MAPK signaling pathway - yeast [04011]" = "04011",
+    "Malaria [05144]" = "05144",
+    "Mannose type O-glycan biosynthesis [00515]" = "00515",
+    "Maturity onset diabetes of the young [04950]" = "04950",
+    "Measles [05162]" = "05162",
+    "Meiosis - yeast [04113]" = "04113",
+    "Melanoma [05218]" = "05218",
+    "Metabolic pathways [01100]" = "01100",
+    "Methane metabolism [00680]" = "00680",
+    "MicroRNAs in cancer [05206]" = "05206",
+    "Microbial metabolism in diverse environments [01120]" = "01120",
+    "Mineral absorption [04978]" = "04978",
+    "Mismatch repair [03430]" = "03430",
+    "Mitophagy - animal [04137]" = "04137",
+    "Mitophagy - yeast [04139]" = "04139",
+    "Monobactam biosynthesis [00261]" = "00261",
+    "Monoterpenoid biosynthesis [00902]" = "00902",
+    "Morphine addiction [05032]" = "05032",
+    "Mucin type O-glycan biosynthesis [00512]" = "00512",
+    "N-Glycan biosynthesis [00510]" = "00510",
+    "NF-kappa B signaling pathway [04064]" = "04064",
+    "NOD-like receptor signaling pathway [04621]" = "04621",
+    "Naphthalene degradation [00626]" = "00626",
+    "Natural killer cell mediated cytotoxicity [04650]" = "04650",
+    "Necroptosis [04217]" = "04217",
+    "Neomycin, kanamycin and gentamicin biosynthesis [00524]" = "00524",
+    "Neuroactive ligand-receptor interaction [04080]" = "04080",
+    "Neurotrophin signaling pathway [04722]" = "04722",
+    "Nicotinate and nicotinamide metabolism [00760]" = "00760",
+    "Nicotine addiction [05033]" = "05033",
+    "Nitrogen metabolism [00910]" = "00910",
+    "Nitrotoluene degradation [00633]" = "00633",
+    "Non-homologous end-joining [03450]" = "03450",
+    "Non-small cell lung cancer [05223]" = "05223",
+    "Nonribosomal peptide structures [01054]" = "01054",
+    "Notch signaling pathway [04330]" = "04330",
+    "Novobiocin biosynthesis [00401]" = "00401",
+    "Nucleocytoplasmic transport [03013]" = "03013",
+    "Nucleotide excision repair [03420]" = "03420",
+    "Nucleotide metabolism [01232]" = "01232",
+    "O-Antigen nucleotide sugar biosynthesis [00541]" = "00541",
+    "O-Antigen repeat unit biosynthesis [00542]" = "00542",
+    "Olfactory transduction [04740]" = "04740",
+    "One carbon pool by folate [00670]" = "00670",
+    "Oocyte meiosis [04114]" = "04114",
+    "Osteoclast differentiation [04380]" = "04380",
+    "Other types of O-glycan biosynthesis [00514]" = "00514",
+    "Oxidative phosphorylation [00190]" = "00190",
+    "PD-L1 expression and PD-1 checkpoint pathway in cancer [05235]" = "05235",
+    "PI3K-Akt signaling pathway [04151]" = "04151",
+    "PPAR signaling pathway [03320]" = "03320",
+    "Pancreatic cancer [05212]" = "05212",
+    "Pancreatic secretion [04972]" = "04972",
+    "Pantothenate and CoA biosynthesis [00770]" = "00770",
+    "Parasite infection [05114]" = "05114",
+    "Parkinson disease [05012]" = "05012",
+    "Pathogenic Escherichia coli infection [05130]" = "05130",
+    "Pathways in cancer [05200]" = "05200",
+    "Pathways of neurodegeneration - multiple diseases [05022]" = "05022",
+    "Penicillin and cephalosporin biosynthesis [00311]" = "00311",
+    "Pentose and glucuronate interconversions [00040]" = "00040",
+    "Pentose phosphate pathway [00030]" = "00030",
+    "Peptidoglycan biosynthesis [00550]" = "00550",
+    "Peroxisome [04146]" = "04146",
+    "Pertussis [05133]" = "05133",
+    "Phagosome [04145]" = "04145",
+    "Phenylalanine metabolism [00360]" = "00360",
+    "Phenylalanine, tyrosine and tryptophan biosynthesis [00400]" = "00400",
+    "Phosphatidylinositol signaling system [04070]" = "04070",
+    "Phospholipase D signaling pathway [04072]" = "04072",
+    "Phosphonate and phosphinate metabolism [00440]" = "00440",
+    "Phosphotransferase system (PTS) [02060]" = "02060",
+    "Photosynthesis [00195]" = "00195",
+    "Photosynthesis - antenna proteins [00196]" = "00196",
+    "Phototransduction [04744]" = "04744",
+    "Phototransduction - fly [04745]" = "04745",
+    "Plant hormone signal transduction [04075]" = "04075",
+    "Platelet activation [04611]" = "04611",
+    "Polycyclic aromatic hydrocarbon degradation [00624]" = "00624",
+    "Polyketide sugar unit biosynthesis [00523]" = "00523",
+    "Porphyrin metabolism [00860]" = "00860",
+    "Primary bile acid biosynthesis [00120]" = "00120",
+    "Primary immunodeficiency [05340]" = "05340",
+    "Prion disease [05020]" = "05020",
+    "Progesterone-mediated oocyte maturation [04914]" = "04914",
+    "Propanoate metabolism [00640]" = "00640",
+    "Prostate cancer [05215]" = "05215",
+    "Proteasome [03050]" = "03050",
+    "Protein digestion and absorption [04974]" = "04974",
+    "Protein export [03060]" = "03060",
+    "Protein processing in endoplasmic reticulum [04141]" = "04141",
+    "Proteoglycans in cancer [05205]" = "05205",
+    "Proximal tubule bicarbonate reclamation [04964]" = "04964",
+    "Purine metabolism [00230]" = "00230",
+    "Pyrimidine metabolism [00240]" = "00240",
+    "Pyruvate metabolism [00620]" = "00620",
+    "RIG-I-like receptor signaling pathway [04622]" = "04622",
+    "RNA degradation [03018]" = "03018",
+    "RNA polymerase [03020]" = "03020",
+    "Rap1 signaling pathway [04015]" = "04015",
+    "Ras signaling pathway [04014]" = "04014",
+    "Regulation of actin cytoskeleton [04810]" = "04810",
+    "Renal cell carcinoma [05211]" = "05211",
+    "Retinol metabolism [00830]" = "00830",
+    "Retrograde endocannabinoid signaling [04723]" = "04723",
+    "Rheumatoid arthritis [05323]" = "05323",
+    "Riboflavin metabolism [00740]" = "00740",
+    "Ribosome [03010]" = "03010",
+    "Ribosome biogenesis in eukaryotes [03008]" = "03008",
+    "SNARE interactions in vesicular transport [04130]" = "04130",
+    "Salivary secretion [04970]" = "04970",
+    "Salmonella infection [05132]" = "05132",
+    "Secondary bile acid biosynthesis [00121]" = "00121",
+    "Selenocompound metabolism [00450]" = "00450",
+    "Serotonergic synapse [04726]" = "04726",
+    "Sesquiterpenoid and triterpenoid biosynthesis [00909]" = "00909",
+    "Shigellosis [05131]" = "05131",
+    "Signaling pathways regulating pluripotency of stem cells [04550]" = "04550",
+    "Small cell lung cancer [05222]" = "05222",
+    "Sphingolipid metabolism [00600]" = "00600",
+    "Sphingolipid signaling pathway [04071]" = "04071",
+    "Spinocerebellar ataxia [05017]" = "05017",
+    "Spliceosome [03040]" = "03040",
+    "Staphylococcus aureus infection [05150]" = "05150",
+    "Starch and sucrose metabolism [00500]" = "00500",
+    "Steroid biosynthesis [00100]" = "00100",
+    "Steroid hormone biosynthesis [00140]" = "00140",
+    "Streptomycin biosynthesis [00521]" = "00521",
+    "Styrene degradation [00643]" = "00643",
+    "Sulfur metabolism [00920]" = "00920",
+    "Sulfur relay system [04122]" = "04122",
+    "Systemic lupus erythematosus [05322]" = "05322",
+    "T cell receptor signaling pathway [04660]" = "04660",
+    "TGF-beta signaling pathway [04350]" = "04350",
+    "TNF signaling pathway [04668]" = "04668",
+    "Taste transduction [04742]" = "04742",
+    "Taurine and hypotaurine metabolism [00430]" = "00430",
+    "Teichoic acid biosynthesis [00552]" = "00552",
+    "Terpenoid backbone biosynthesis [00900]" = "00900",
+    "Th1 and Th2 cell differentiation [04658]" = "04658",
+    "Th17 cell differentiation [04659]" = "04659",
+    "Thermogenesis [04714]" = "04714",
+    "Thiamine metabolism [00730]" = "00730",
+    "Thyroid cancer [05216]" = "05216",
+    "Tight junction [04530]" = "04530",
+    "Toll-like receptor signaling pathway [04620]" = "04620",
+    "Toxoplasmosis [05145]" = "05145",
+    "Transcriptional misregulation in cancer [05202]" = "05202",
+    "Tryptophan metabolism [00380]" = "00380",
+    "Tuberculosis [05152]" = "05152",
+    "Two-component system [02020]" = "02020",
+    "Type I diabetes mellitus [04940]" = "04940",
+    "Type I polyketide structures [01052]" = "01052",
+    "Type II diabetes mellitus [04930]" = "04930",
+    "Tyrosine metabolism [00350]" = "00350",
+    "Ubiquinone and other terpenoid-quinone biosynthesis [00130]" = "00130",
+    "Ubiquitin mediated proteolysis [04120]" = "04120",
+    "VEGF signaling pathway [04370]" = "04370",
+    "Valine, leucine and isoleucine biosynthesis [00290]" = "00290",
+    "Valine, leucine and isoleucine degradation [00280]" = "00280",
+    "Various types of N-glycan biosynthesis [00513]" = "00513",
+    "Vascular smooth muscle contraction [04270]" = "04270",
+    "Vasopressin-regulated water reabsorption [04962]" = "04962",
+    "Vibrio cholerae infection [05110]" = "05110",
+    "Viral carcinogenesis [05203]" = "05203",
+    "Viral myocarditis [05416]" = "05416",
+    "Viral protein interaction with cytokine and cytokine receptor [04061]" = "04061",
+    "Vitamin B6 metabolism [00750]" = "00750",
+    "Vitamin digestion and absorption [04977]" = "04977",
+    "Wnt signaling pathway [04310]" = "04310",
+    "Xylene degradation [00622]" = "00622",
+    "Yersinia infection [05135]" = "05135",
+    "Zeatin biosynthesis [00908]" = "00908",
+    "alpha-Linolenic acid metabolism [00592]" = "00592",
+    "beta-Alanine metabolism [00410]" = "00410",
+    "cAMP signaling pathway [04024]" = "04024",
+    "cGMP-PKG signaling pathway [04022]" = "04022",
+    "mRNA surveillance pathway [03015]" = "03015",
+    "mTOR signaling pathway [04150]" = "04150",
+    "p53 signaling pathway [04115]" = "04115"
+  )
+
+# Total: 409 pathways
+
+  c(
+    "2-Oxocarboxylic acid metabolism [01210]" = "01210",
+    "ABC transporters [02010]" = "02010",
+    "AMPK signaling pathway [04152]" = "04152",
+    "Acarbose and validamycin biosynthesis [00525]" = "00525",
+    "Acridone alkaloid biosynthesis [01058]" = "01058",
+    "Acute myeloid leukemia [05221]" = "05221",
+    "Adherens junction [04520]" = "04520",
+    "Adipocytokine signaling pathway [04920]" = "04920",
+    "Adrenergic signaling in cardiomyocytes [04261]" = "04261",
+    "African trypanosomiasis [05143]" = "05143",
+    "Alanine, aspartate and glutamate metabolism [00250]" = "00250",
+    "Alcoholism [05034]" = "05034",
+    "Aldosterone-regulated sodium reabsorption [04960]" = "04960",
+    "Allograft rejection [05330]" = "05330",
+    "Alzheimer disease [05010]" = "05010",
+    "Amino sugar and nucleotide sugar metabolism [00520]" = "00520",
+    "Aminoacyl-tRNA biosynthesis [00970]" = "00970",
+    "Aminobenzoate degradation [00627]" = "00627",
+    "Amoebiasis [05146]" = "05146",
+    "Amphetamine addiction [05031]" = "05031",
+    "Amyotrophic lateral sclerosis [05014]" = "05014",
+    "Antigen processing and presentation [04612]" = "04612",
+    "Apelin signaling pathway [04371]" = "04371",
+    "Apoptosis [04210]" = "04210",
+    "Apoptosis - fly [04214]" = "04214",
+    "Apoptosis - multiple species [04215]" = "04215",
+    "Arabinogalactan biosynthesis - Mycobacterium [00572]" = "00572",
+    "Arachidonic acid metabolism [00590]" = "00590",
+    "Arginine and proline metabolism [00330]" = "00330",
+    "Arginine biosynthesis [00220]" = "00220",
+    "Arrhythmogenic right ventricular cardiomyopathy [05412]" = "05412",
+    "Ascorbate and aldarate metabolism [00053]" = "00053",
+    "Asthma [05310]" = "05310",
+    "Atrazine degradation [00791]" = "00791",
+    "Autoimmune thyroid disease [05320]" = "05320",
+    "Autophagy - animal [04140]" = "04140",
+    "Autophagy - other [04136]" = "04136",
+    "Autophagy - yeast [04138]" = "04138",
+    "Axon guidance [04360]" = "04360",
+    "B cell receptor signaling pathway [04662]" = "04662",
+    "Bacterial invasion of epithelial cells [05100]" = "05100",
+    "Bacterial secretion system [03070]" = "03070",
+    "Basal cell carcinoma [05217]" = "05217",
+    "Basal transcription factors [03022]" = "03022",
+    "Base excision repair [03410]" = "03410",
+    "Benzoate degradation [00362]" = "00362",
+    "Bile secretion [04976]" = "04976",
+    "Biofilm formation - Escherichia coli [05112]" = "05112",
+    "Biofilm formation - Pseudomonas aeruginosa [05113]" = "05113",
+    "Biofilm formation - Vibrio cholerae [05111]" = "05111",
+    "Biosynthesis of 12-, 14- and 16-membered macrolides [00522]" = "00522",
+    "Biosynthesis of alkaloids derived from histidine and purine [01065]" = "01065",
+    "Biosynthesis of alkaloids derived from ornithine, lysine and nicotinic acid [01064]" = "01064",
+    "Biosynthesis of alkaloids derived from shikimate pathway [01063]" = "01063",
+    "Biosynthesis of alkaloids derived from terpenoid and polyketide [01066]" = "01066",
+    "Biosynthesis of amino acids [01230]" = "01230",
+    "Biosynthesis of ansamycins [01051]" = "01051",
+    "Biosynthesis of cofactors [01240]" = "01240",
+    "Biosynthesis of enediyne antibiotics [01059]" = "01059",
+    "Biosynthesis of nucleotide sugars [01250]" = "01250",
+    "Biosynthesis of phenylpropanoids [01061]" = "01061",
+    "Biosynthesis of plant hormones [01070]" = "01070",
+    "Biosynthesis of plant secondary metabolites [01060]" = "01060",
+    "Biosynthesis of secondary metabolites [01110]" = "01110",
+    "Biosynthesis of siderophore group nonribosomal peptides [01053]" = "01053",
+    "Biosynthesis of terpenoids and steroids [01062]" = "01062",
+    "Biosynthesis of type II polyketide backbone [01056]" = "01056",
+    "Biosynthesis of type II polyketide products [01057]" = "01057",
+    "Biosynthesis of unsaturated fatty acids [01040]" = "01040",
+    "Biosynthesis of vancomycin group antibiotics [01055]" = "01055",
+    "Biotin metabolism [00780]" = "00780",
+    "Bisphenol degradation [00363]" = "00363",
+    "Bladder cancer [05219]" = "05219",
+    "Brassinosteroid biosynthesis [00905]" = "00905",
+    "Breast cancer [05224]" = "05224",
+    "Butanoate metabolism [00650]" = "00650",
+    "C-type lectin receptor signaling pathway [04625]" = "04625",
+    "C5-Branched dibasic acid metabolism [00660]" = "00660",
+    "Caffeine metabolism [00232]" = "00232",
+    "Calcium signaling pathway [04020]" = "04020",
+    "Cannabinoid addiction [05035]" = "05035",
+    "Caprolactam degradation [00930]" = "00930",
+    "Carbapenem biosynthesis [00332]" = "00332",
+    "Carbohydrate digestion and absorption [04973]" = "04973",
+    "Carbon fixation in photosynthetic organisms [00710]" = "00710",
+    "Carbon fixation pathways in prokaryotes [00720]" = "00720",
+    "Carbon metabolism [01200]" = "01200",
+    "Cardiac muscle contraction [04260]" = "04260",
+    "Carotenoid biosynthesis [00906]" = "00906",
+    "Cell adhesion molecules [04514]" = "04514",
+    "Cell cycle [04110]" = "04110",
+    "Cell cycle - Caulobacter [04112]" = "04112",
+    "Cell cycle - yeast [04111]" = "04111",
+    "Cellular senescence [04218]" = "04218",
+    "Central carbon metabolism in cancer [05230]" = "05230",
+    "Chagas disease [05142]" = "05142",
+    "Chemical carcinogenesis - DNA adducts [05204]" = "05204",
+    "Chemical carcinogenesis - reactive oxygen species [05208]" = "05208",
+    "Chemical carcinogenesis - receptor activation [05207]" = "05207",
+    "Chemokine signaling pathway [04062]" = "04062",
+    "Chloroalkane and chloroalkene degradation [00625]" = "00625",
+    "Chlorocyclohexane and chlorobenzene degradation [00361]" = "00361",
+    "Cholesterol metabolism [04979]" = "04979",
+    "Choline metabolism in cancer [05231]" = "05231",
+    "Cholinergic synapse [04725]" = "04725",
+    "Chronic myeloid leukemia [05220]" = "05220",
+    "Circadian entrainment [04713]" = "04713",
+    "Circadian rhythm [04710]" = "04710",
+    "Circadian rhythm - fly [04711]" = "04711",
+    "Circadian rhythm - plant [04712]" = "04712",
+    "Citrate cycle (TCA cycle) [00020]" = "00020",
+    "Clavulanic acid biosynthesis [00331]" = "00331",
+    "Cocaine addiction [05030]" = "05030",
+    "Collecting duct acid secretion [04966]" = "04966",
+    "Colorectal cancer [05210]" = "05210",
+    "Complement and coagulation cascades [04610]" = "04610",
+    "Coronavirus disease - COVID-19 [05171]" = "05171",
+    "Cutin, suberine and wax biosynthesis [00073]" = "00073",
+    "Cyanoamino acid metabolism [00460]" = "00460",
+    "Cysteine and methionine metabolism [00270]" = "00270",
+    "Cytokine-cytokine receptor interaction [04060]" = "04060",
+    "Cytosolic DNA-sensing pathway [04623]" = "04623",
+    "D-Alanine metabolism [00473]" = "00473",
+    "D-Arginine and D-ornithine metabolism [00472]" = "00472",
+    "D-Glutamine and D-glutamate metabolism [00471]" = "00471",
+    "DNA replication [03030]" = "03030",
+    "Degradation of aromatic compounds [01220]" = "01220",
+    "Diabetic cardiomyopathy [05415]" = "05415",
+    "Dilated cardiomyopathy [05414]" = "05414",
+    "Dioxin degradation [00621]" = "00621",
+    "Diterpenoid biosynthesis [00904]" = "00904",
+    "Dopaminergic synapse [04728]" = "04728",
+    "ECM-receptor interaction [04512]" = "04512",
+    "Endocrine and other factor-regulated calcium reabsorption [04961]" = "04961",
+    "Endocytosis [04144]" = "04144",
+    "Endometrial cancer [05213]" = "05213",
+    "Epithelial cell signaling in Helicobacter pylori infection [05120]" = "05120",
+    "Epstein-Barr virus infection [05169]" = "05169",
+    "ErbB signaling pathway [04012]" = "04012",
+    "Ether lipid metabolism [00565]" = "00565",
+    "Ethylbenzene degradation [00642]" = "00642",
+    "Exopolysaccharide biosynthesis [00543]" = "00543",
+    "Fanconi anemia pathway [03460]" = "03460",
+    "Fat digestion and absorption [04975]" = "04975",
+    "Fatty acid biosynthesis [00061]" = "00061",
+    "Fatty acid degradation [00071]" = "00071",
+    "Fatty acid elongation [00062]" = "00062",
+    "Fatty acid metabolism [01212]" = "01212",
+    "Fc epsilon RI signaling pathway [04664]" = "04664",
+    "Fc gamma R-mediated phagocytosis [04666]" = "04666",
+    "Ferroptosis [04216]" = "04216",
+    "Ferroptosis [04716]" = "04716",
+    "Fluid shear stress and atherosclerosis [05418]" = "05418",
+    "Fluorobenzoate degradation [00364]" = "00364",
+    "Focal adhesion [04510]" = "04510",
+    "Folate biosynthesis [00790]" = "00790",
+    "FoxO signaling pathway [04068]" = "04068",
+    "Fructose and mannose metabolism [00051]" = "00051",
+    "GABAergic synapse [04727]" = "04727",
+    "Galactose metabolism [00052]" = "00052",
+    "Gap junction [04540]" = "04540",
+    "Gastric acid secretion [04971]" = "04971",
+    "Gastric cancer [05226]" = "05226",
+    "Geraniol degradation [00281]" = "00281",
+    "Glioma [05214]" = "05214",
+    "Glutamatergic synapse [04724]" = "04724",
+    "Glutathione metabolism [00480]" = "00480",
+    "Glycerolipid metabolism [00561]" = "00561",
+    "Glycerophospholipid metabolism [00564]" = "00564",
+    "Glycine, serine and threonine metabolism [00260]" = "00260",
+    "Glycolysis / Gluconeogenesis [00010]" = "00010",
+    "Glycosaminoglycan biosynthesis - chondroitin sulfate / dermatan sulfate [00532]" = "00532",
+    "Glycosaminoglycan biosynthesis - heparan sulfate / heparin [00534]" = "00534",
+    "Glycosaminoglycan biosynthesis - keratan sulfate [00533]" = "00533",
+    "Glycosaminoglycan degradation [00531]" = "00531",
+    "Glycosphingolipid biosynthesis - ganglio series [00604]" = "00604",
+    "Glycosphingolipid biosynthesis - globo and isoglobo series [00603]" = "00603",
+    "Glycosphingolipid biosynthesis - lacto and neolacto series [00601]" = "00601",
+    "Glycosylphosphatidylinositol (GPI)-anchor biosynthesis [00563]" = "00563",
+    "Glyoxylate and dicarboxylate metabolism [00630]" = "00630",
+    "Graft-versus-host disease [05332]" = "05332",
+    "HIF-1 signaling pathway [04066]" = "04066",
+    "Hedgehog signaling pathway [04340]" = "04340",
+    "Hedgehog signaling pathway - fly [04341]" = "04341",
+    "Hematopoietic cell lineage [04640]" = "04640",
+    "Hepatitis B [05161]" = "05161",
+    "Hepatitis C [05160]" = "05160",
+    "Hepatocellular carcinoma [05225]" = "05225",
+    "Herpes simplex virus 1 infection [05168]" = "05168",
+    "Hippo signaling pathway [04390]" = "04390",
+    "Hippo signaling pathway - fly [04391]" = "04391",
+    "Hippo signaling pathway - multiple species [04392]" = "04392",
+    "Histidine metabolism [00340]" = "00340",
+    "Homologous recombination [03440]" = "03440",
+    "Human T-cell leukemia virus 1 infection [05166]" = "05166",
+    "Human cytomegalovirus infection [05163]" = "05163",
+    "Human immunodeficiency virus 1 infection [05170]" = "05170",
+    "Human papillomavirus infection [05165]" = "05165",
+    "Huntington disease [05016]" = "05016",
+    "Hypertrophic cardiomyopathy [05410]" = "05410",
+    "IL-17 signaling pathway [04657]" = "04657",
+    "Inflammatory bowel disease [05321]" = "05321",
+    "Inflammatory mediator regulation of TRP channels [04750]" = "04750",
+    "Influenza A [05164]" = "05164",
+    "Inositol phosphate metabolism [00562]" = "00562",
+    "Insect hormone biosynthesis [00981]" = "00981",
+    "Insulin signaling pathway [04910]" = "04910",
+    "JAK-STAT signaling pathway [04630]" = "04630",
+    "Kaposi sarcoma-associated herpesvirus infection [05167]" = "05167",
+    "Legionellosis [05134]" = "05134",
+    "Leishmaniasis [05140]" = "05140",
+    "Leishmaniasis [05148]" = "05148",
+    "Leukocyte transendothelial migration [04670]" = "04670",
+    "Limonene and pinene degradation [00903]" = "00903",
+    "Linoleic acid metabolism [00591]" = "00591",
+    "Lipoarabinomannan (LAM) biosynthesis [00571]" = "00571",
+    "Lipoic acid metabolism [00785]" = "00785",
+    "Lipopolysaccharide biosynthesis [00540]" = "00540",
+    "Long-term depression [04730]" = "04730",
+    "Long-term potentiation [04720]" = "04720",
+    "Longevity regulating pathway [04211]" = "04211",
+    "Longevity regulating pathway - multiple species [04213]" = "04213",
+    "Longevity regulating pathway - worm [04212]" = "04212",
+    "Lysine biosynthesis [00300]" = "00300",
+    "Lysine degradation [00310]" = "00310",
+    "Lysosome [04142]" = "04142",
+    "MAPK signaling pathway [04010]" = "04010",
+    "MAPK signaling pathway - fly [04013]" = "04013",
+    "MAPK signaling pathway - plant [04016]" = "04016",
+    "MAPK signaling pathway - yeast [04011]" = "04011",
+    "Malaria [05144]" = "05144",
+    "Mannose type O-glycan biosynthesis [00515]" = "00515",
+    "Maturity onset diabetes of the young [04950]" = "04950",
+    "Measles [05162]" = "05162",
+    "Meiosis - yeast [04113]" = "04113",
+    "Melanoma [05218]" = "05218",
+    "Metabolic pathways [01100]" = "01100",
+    "Methane metabolism [00680]" = "00680",
+    "MicroRNAs in cancer [05206]" = "05206",
+    "Microbial metabolism in diverse environments [01120]" = "01120",
+    "Mineral absorption [04978]" = "04978",
+    "Mismatch repair [03430]" = "03430",
+    "Mitophagy - animal [04137]" = "04137",
+    "Mitophagy - yeast [04139]" = "04139",
+    "Monobactam biosynthesis [00261]" = "00261",
+    "Monoterpenoid biosynthesis [00902]" = "00902",
+    "Morphine addiction [05032]" = "05032",
+    "Mucin type O-glycan biosynthesis [00512]" = "00512",
+    "N-Glycan biosynthesis [00510]" = "00510",
+    "NF-kappa B signaling pathway [04064]" = "04064",
+    "NOD-like receptor signaling pathway [04621]" = "04621",
+    "Naphthalene degradation [00626]" = "00626",
+    "Natural killer cell mediated cytotoxicity [04650]" = "04650",
+    "Necroptosis [04217]" = "04217",
+    "Neomycin, kanamycin and gentamicin biosynthesis [00524]" = "00524",
+    "Neuroactive ligand-receptor interaction [04080]" = "04080",
+    "Neurotrophin signaling pathway [04722]" = "04722",
+    "Nicotinate and nicotinamide metabolism [00760]" = "00760",
+    "Nicotine addiction [05033]" = "05033",
+    "Nitrogen metabolism [00910]" = "00910",
+    "Nitrotoluene degradation [00633]" = "00633",
+    "Non-homologous end-joining [03450]" = "03450",
+    "Non-small cell lung cancer [05223]" = "05223",
+    "Nonribosomal peptide structures [01054]" = "01054",
+    "Notch signaling pathway [04330]" = "04330",
+    "Novobiocin biosynthesis [00401]" = "00401",
+    "Nucleocytoplasmic transport [03013]" = "03013",
+    "Nucleotide excision repair [03420]" = "03420",
+    "Nucleotide metabolism [01232]" = "01232",
+    "O-Antigen nucleotide sugar biosynthesis [00541]" = "00541",
+    "O-Antigen repeat unit biosynthesis [00542]" = "00542",
+    "Olfactory transduction [04740]" = "04740",
+    "One carbon pool by folate [00670]" = "00670",
+    "Oocyte meiosis [04114]" = "04114",
+    "Osteoclast differentiation [04380]" = "04380",
+    "Other types of O-glycan biosynthesis [00514]" = "00514",
+    "Oxidative phosphorylation [00190]" = "00190",
+    "PD-L1 expression and PD-1 checkpoint pathway in cancer [05235]" = "05235",
+    "PI3K-Akt signaling pathway [04151]" = "04151",
+    "PPAR signaling pathway [03320]" = "03320",
+    "Pancreatic cancer [05212]" = "05212",
+    "Pancreatic secretion [04972]" = "04972",
+    "Pantothenate and CoA biosynthesis [00770]" = "00770",
+    "Parasite infection [05114]" = "05114",
+    "Parkinson disease [05012]" = "05012",
+    "Pathogenic Escherichia coli infection [05130]" = "05130",
+    "Pathways in cancer [05200]" = "05200",
+    "Pathways of neurodegeneration - multiple diseases [05022]" = "05022",
+    "Penicillin and cephalosporin biosynthesis [00311]" = "00311",
+    "Pentose and glucuronate interconversions [00040]" = "00040",
+    "Pentose phosphate pathway [00030]" = "00030",
+    "Peptidoglycan biosynthesis [00550]" = "00550",
+    "Peroxisome [04146]" = "04146",
+    "Pertussis [05133]" = "05133",
+    "Phagosome [04145]" = "04145",
+    "Phenylalanine metabolism [00360]" = "00360",
+    "Phenylalanine, tyrosine and tryptophan biosynthesis [00400]" = "00400",
+    "Phosphatidylinositol signaling system [04070]" = "04070",
+    "Phospholipase D signaling pathway [04072]" = "04072",
+    "Phosphonate and phosphinate metabolism [00440]" = "00440",
+    "Phosphotransferase system (PTS) [02060]" = "02060",
+    "Photosynthesis [00195]" = "00195",
+    "Photosynthesis - antenna proteins [00196]" = "00196",
+    "Phototransduction [04744]" = "04744",
+    "Phototransduction - fly [04745]" = "04745",
+    "Plant hormone signal transduction [04075]" = "04075",
+    "Platelet activation [04611]" = "04611",
+    "Polycyclic aromatic hydrocarbon degradation [00624]" = "00624",
+    "Polyketide sugar unit biosynthesis [00523]" = "00523",
+    "Porphyrin metabolism [00860]" = "00860",
+    "Primary bile acid biosynthesis [00120]" = "00120",
+    "Primary immunodeficiency [05340]" = "05340",
+    "Prion disease [05020]" = "05020",
+    "Progesterone-mediated oocyte maturation [04914]" = "04914",
+    "Propanoate metabolism [00640]" = "00640",
+    "Prostate cancer [05215]" = "05215",
+    "Proteasome [03050]" = "03050",
+    "Protein digestion and absorption [04974]" = "04974",
+    "Protein export [03060]" = "03060",
+    "Protein processing in endoplasmic reticulum [04141]" = "04141",
+    "Proteoglycans in cancer [05205]" = "05205",
+    "Proximal tubule bicarbonate reclamation [04964]" = "04964",
+    "Purine metabolism [00230]" = "00230",
+    "Pyrimidine metabolism [00240]" = "00240",
+    "Pyruvate metabolism [00620]" = "00620",
+    "RIG-I-like receptor signaling pathway [04622]" = "04622",
+    "RNA degradation [03018]" = "03018",
+    "RNA polymerase [03020]" = "03020",
+    "Rap1 signaling pathway [04015]" = "04015",
+    "Ras signaling pathway [04014]" = "04014",
+    "Regulation of actin cytoskeleton [04810]" = "04810",
+    "Renal cell carcinoma [05211]" = "05211",
+    "Retinol metabolism [00830]" = "00830",
+    "Retrograde endocannabinoid signaling [04723]" = "04723",
+    "Rheumatoid arthritis [05323]" = "05323",
+    "Riboflavin metabolism [00740]" = "00740",
+    "Ribosome [03010]" = "03010",
+    "Ribosome biogenesis in eukaryotes [03008]" = "03008",
+    "SNARE interactions in vesicular transport [04130]" = "04130",
+    "Salivary secretion [04970]" = "04970",
+    "Salmonella infection [05132]" = "05132",
+    "Secondary bile acid biosynthesis [00121]" = "00121",
+    "Selenocompound metabolism [00450]" = "00450",
+    "Serotonergic synapse [04726]" = "04726",
+    "Sesquiterpenoid and triterpenoid biosynthesis [00909]" = "00909",
+    "Shigellosis [05131]" = "05131",
+    "Signaling pathways regulating pluripotency of stem cells [04550]" = "04550",
+    "Small cell lung cancer [05222]" = "05222",
+    "Sphingolipid metabolism [00600]" = "00600",
+    "Sphingolipid signaling pathway [04071]" = "04071",
+    "Spinocerebellar ataxia [05017]" = "05017",
+    "Spliceosome [03040]" = "03040",
+    "Staphylococcus aureus infection [05150]" = "05150",
+    "Starch and sucrose metabolism [00500]" = "00500",
+    "Steroid biosynthesis [00100]" = "00100",
+    "Steroid hormone biosynthesis [00140]" = "00140",
+    "Streptomycin biosynthesis [00521]" = "00521",
+    "Styrene degradation [00643]" = "00643",
+    "Sulfur metabolism [00920]" = "00920",
+    "Sulfur relay system [04122]" = "04122",
+    "Systemic lupus erythematosus [05322]" = "05322",
+    "T cell receptor signaling pathway [04660]" = "04660",
+    "TGF-beta signaling pathway [04350]" = "04350",
+    "TNF signaling pathway [04668]" = "04668",
+    "Taste transduction [04742]" = "04742",
+    "Taurine and hypotaurine metabolism [00430]" = "00430",
+    "Teichoic acid biosynthesis [00552]" = "00552",
+    "Terpenoid backbone biosynthesis [00900]" = "00900",
+    "Th1 and Th2 cell differentiation [04658]" = "04658",
+    "Th17 cell differentiation [04659]" = "04659",
+    "Thermogenesis [04714]" = "04714",
+    "Thiamine metabolism [00730]" = "00730",
+    "Thyroid cancer [05216]" = "05216",
+    "Tight junction [04530]" = "04530",
+    "Toll-like receptor signaling pathway [04620]" = "04620",
+    "Toxoplasmosis [05145]" = "05145",
+    "Transcriptional misregulation in cancer [05202]" = "05202",
+    "Tryptophan metabolism [00380]" = "00380",
+    "Tuberculosis [05152]" = "05152",
+    "Two-component system [02020]" = "02020",
+    "Type I diabetes mellitus [04940]" = "04940",
+    "Type I polyketide structures [01052]" = "01052",
+    "Type II diabetes mellitus [04930]" = "04930",
+    "Tyrosine metabolism [00350]" = "00350",
+    "Ubiquinone and other terpenoid-quinone biosynthesis [00130]" = "00130",
+    "Ubiquitin mediated proteolysis [04120]" = "04120",
+    "VEGF signaling pathway [04370]" = "04370",
+    "Valine, leucine and isoleucine biosynthesis [00290]" = "00290",
+    "Valine, leucine and isoleucine degradation [00280]" = "00280",
+    "Various types of N-glycan biosynthesis [00513]" = "00513",
+    "Vascular smooth muscle contraction [04270]" = "04270",
+    "Vasopressin-regulated water reabsorption [04962]" = "04962",
+    "Vibrio cholerae infection [05110]" = "05110",
+    "Viral carcinogenesis [05203]" = "05203",
+    "Viral myocarditis [05416]" = "05416",
+    "Viral protein interaction with cytokine and cytokine receptor [04061]" = "04061",
+    "Vitamin B6 metabolism [00750]" = "00750",
+    "Vitamin digestion and absorption [04977]" = "04977",
+    "Wnt signaling pathway [04310]" = "04310",
+    "Xylene degradation [00622]" = "00622",
+    "Yersinia infection [05135]" = "05135",
+    "Zeatin biosynthesis [00908]" = "00908",
+    "alpha-Linolenic acid metabolism [00592]" = "00592",
+    "beta-Alanine metabolism [00410]" = "00410",
+    "cAMP signaling pathway [04024]" = "04024",
+    "cGMP-PKG signaling pathway [04022]" = "04022",
+    "mRNA surveillance pathway [03015]" = "03015",
+    "mTOR signaling pathway [04150]" = "04150",
+    "p53 signaling pathway [04115]" = "04115"
+  )
+
+# Total: 409 pathways
+KEGG_HIERARCHY <- list(
+  "1. Metabolism" = list(
+    "1.0 Global and overview maps" = list(
+      list(id="01100", name="Metabolic pathways"),
+      list(id="01110", name="Biosynthesis of secondary metabolites"),
+      list(id="01120", name="Microbial metabolism in diverse environments"),
+      list(id="01200", name="Carbon metabolism"),
+      list(id="01210", name="2-Oxocarboxylic acid metabolism"),
+      list(id="01212", name="Fatty acid metabolism"),
+      list(id="01230", name="Biosynthesis of amino acids"),
+      list(id="01232", name="Nucleotide metabolism"),
+      list(id="01250", name="Biosynthesis of nucleotide sugars"),
+      list(id="01240", name="Biosynthesis of cofactors"),
+      list(id="01220", name="Degradation of aromatic compounds"),
+      list(id="01310", name="Nitrogen cycle"),
+      list(id="01320", name="Sulfur cycle")
+    ),
+    "1.1 Carbohydrate metabolism" = list(
+      list(id="00010", name="Glycolysis / Gluconeogenesis"),
+      list(id="00020", name="Citrate cycle (TCA cycle)"),
+      list(id="00030", name="Pentose phosphate pathway"),
+      list(id="00040", name="Pentose and glucuronate interconversions"),
+      list(id="00051", name="Fructose and mannose metabolism"),
+      list(id="00052", name="Galactose metabolism"),
+      list(id="00053", name="Ascorbate and aldarate metabolism"),
+      list(id="00500", name="Starch and sucrose metabolism"),
+      list(id="00620", name="Pyruvate metabolism"),
+      list(id="00630", name="Glyoxylate and dicarboxylate metabolism"),
+      list(id="00640", name="Propanoate metabolism"),
+      list(id="00650", name="Butanoate metabolism"),
+      list(id="00660", name="C5-Branched dibasic acid metabolism"),
+      list(id="00562", name="Inositol phosphate metabolism"),
+      list(id="00566", name="Sulfoquinovose metabolism")
+    ),
+    "1.2 Energy metabolism" = list(
+      list(id="00190", name="Oxidative phosphorylation"),
+      list(id="00195", name="Photosynthesis"),
+      list(id="00196", name="Photosynthesis - antenna proteins"),
+      list(id="00710", name="Carbon fixation by Calvin cycle"),
+      list(id="00720", name="Other carbon fixation pathways"),
+      list(id="00680", name="Methane metabolism"),
+      list(id="00910", name="Nitrogen metabolism"),
+      list(id="00920", name="Sulfur metabolism")
+    ),
+    "1.3 Lipid metabolism" = list(
+      list(id="00061", name="Fatty acid biosynthesis"),
+      list(id="00062", name="Fatty acid elongation"),
+      list(id="00071", name="Fatty acid degradation"),
+      list(id="00073", name="Cutin, suberine and wax biosynthesis"),
+      list(id="00074", name="Mycolic acid biosynthesis"),
+      list(id="00100", name="Steroid biosynthesis"),
+      list(id="00120", name="Primary bile acid biosynthesis"),
+      list(id="00121", name="Secondary bile acid biosynthesis"),
+      list(id="00140", name="Steroid hormone biosynthesis"),
+      list(id="00561", name="Glycerolipid metabolism"),
+      list(id="00564", name="Glycerophospholipid metabolism"),
+      list(id="00565", name="Ether lipid metabolism"),
+      list(id="00600", name="Sphingolipid metabolism"),
+      list(id="00590", name="Arachidonic acid metabolism"),
+      list(id="00591", name="Linoleic acid metabolism"),
+      list(id="00592", name="alpha-Linolenic acid metabolism"),
+      list(id="01040", name="Biosynthesis of unsaturated fatty acids")
+    ),
+    "1.4 Nucleotide metabolism" = list(
+      list(id="00230", name="Purine metabolism"),
+      list(id="00240", name="Pyrimidine metabolism")
+    ),
+    "1.5 Amino acid metabolism" = list(
+      list(id="00250", name="Alanine, aspartate and glutamate metabolism"),
+      list(id="00260", name="Glycine, serine and threonine metabolism"),
+      list(id="00270", name="Cysteine and methionine metabolism"),
+      list(id="00280", name="Valine, leucine and isoleucine degradation"),
+      list(id="00290", name="Valine, leucine and isoleucine biosynthesis"),
+      list(id="00300", name="Lysine biosynthesis"),
+      list(id="00310", name="Lysine degradation"),
+      list(id="00220", name="Arginine biosynthesis"),
+      list(id="00330", name="Arginine and proline metabolism"),
+      list(id="00340", name="Histidine metabolism"),
+      list(id="00350", name="Tyrosine metabolism"),
+      list(id="00360", name="Phenylalanine metabolism"),
+      list(id="00380", name="Tryptophan metabolism"),
+      list(id="00400", name="Phenylalanine, tyrosine and tryptophan biosynthesis")
+    ),
+    "1.6 Other amino acids" = list(
+      list(id="00410", name="beta-Alanine metabolism"),
+      list(id="00430", name="Taurine and hypotaurine metabolism"),
+      list(id="00440", name="Phosphonate and phosphinate metabolism"),
+      list(id="00450", name="Selenocompound metabolism"),
+      list(id="00460", name="Cyanoamino acid metabolism"),
+      list(id="00470", name="D-Amino acid metabolism"),
+      list(id="00480", name="Glutathione metabolism")
+    ),
+    "1.7 Glycan biosynthesis and metabolism" = list(
+      list(id="00520", name="Amino sugar and nucleotide sugar metabolism"),
+      list(id="00541", name="Biosynthesis of various nucleotide sugars"),
+      list(id="00510", name="N-Glycan biosynthesis"),
+      list(id="00513", name="Various types of N-glycan biosynthesis"),
+      list(id="00512", name="Mucin type O-glycan biosynthesis"),
+      list(id="00515", name="Mannose type O-glycan biosynthesis"),
+      list(id="00514", name="Other types of O-glycan biosynthesis"),
+      list(id="00532", name="Glycosaminoglycan biosynthesis - chondroitin sulfate"),
+      list(id="00534", name="Glycosaminoglycan biosynthesis - heparan sulfate"),
+      list(id="00533", name="Glycosaminoglycan biosynthesis - keratan sulfate"),
+      list(id="00531", name="Glycosaminoglycan degradation"),
+      list(id="00563", name="Glycosylphosphatidylinositol (GPI)-anchor biosynthesis"),
+      list(id="00601", name="Glycosphingolipid biosynthesis - lacto and neolacto series"),
+      list(id="00603", name="Glycosphingolipid biosynthesis - globo and isoglobo series"),
+      list(id="00604", name="Glycosphingolipid biosynthesis - ganglio series"),
+      list(id="00511", name="Other glycan degradation"),
+      list(id="00540", name="Lipopolysaccharide biosynthesis"),
+      list(id="00542", name="O-Antigen repeat unit biosynthesis"),
+      list(id="00550", name="Peptidoglycan biosynthesis"),
+      list(id="00552", name="Teichoic acid biosynthesis"),
+      list(id="00571", name="Lipoarabinomannan (LAM) biosynthesis"),
+      list(id="00572", name="Arabinogalactan biosynthesis - Mycobacterium"),
+      list(id="00543", name="Exopolysaccharide biosynthesis")
+    ),
+    "1.8 Cofactors and vitamins" = list(
+      list(id="00730", name="Thiamine metabolism"),
+      list(id="00740", name="Riboflavin metabolism"),
+      list(id="00750", name="Vitamin B6 metabolism"),
+      list(id="00760", name="Nicotinate and nicotinamide metabolism"),
+      list(id="00770", name="Pantothenate and CoA biosynthesis"),
+      list(id="00780", name="Biotin metabolism"),
+      list(id="00785", name="Lipoic acid metabolism"),
+      list(id="00790", name="Folate biosynthesis"),
+      list(id="00670", name="One carbon pool by folate"),
+      list(id="00830", name="Retinol metabolism"),
+      list(id="00860", name="Porphyrin metabolism"),
+      list(id="00130", name="Ubiquinone and other terpenoid-quinone biosynthesis")
+    ),
+    "1.9 Terpenoids and polyketides" = list(
+      list(id="00900", name="Terpenoid backbone biosynthesis"),
+      list(id="00902", name="Monoterpenoid biosynthesis"),
+      list(id="00909", name="Sesquiterpenoid and triterpenoid biosynthesis"),
+      list(id="00904", name="Diterpenoid biosynthesis"),
+      list(id="00906", name="Carotenoid biosynthesis"),
+      list(id="00905", name="Brassinosteroid biosynthesis"),
+      list(id="00981", name="Insect hormone biosynthesis"),
+      list(id="00908", name="Zeatin biosynthesis"),
+      list(id="00903", name="Limonene degradation"),
+      list(id="00907", name="Pinene, camphor and geraniol degradation"),
+      list(id="01052", name="Type I polyketide structures"),
+      list(id="00522", name="Biosynthesis of 12-, 14- and 16-membered macrolides"),
+      list(id="01051", name="Biosynthesis of ansamycins"),
+      list(id="01059", name="Biosynthesis of enediyne antibiotics"),
+      list(id="01056", name="Biosynthesis of type II polyketide backbone"),
+      list(id="01057", name="Biosynthesis of type II polyketide products"),
+      list(id="00253", name="Tetracycline biosynthesis"),
+      list(id="00523", name="Polyketide sugar unit biosynthesis"),
+      list(id="01054", name="Nonribosomal peptide structures"),
+      list(id="01053", name="Biosynthesis of siderophore group nonribosomal peptides"),
+      list(id="01055", name="Biosynthesis of vancomycin group antibiotics")
+    ),
+    "1.10 Other secondary metabolites" = list(
+      list(id="00940", name="Phenylpropanoid biosynthesis"),
+      list(id="00945", name="Stilbenoid, diarylheptanoid and gingerol biosynthesis"),
+      list(id="00941", name="Flavonoid biosynthesis"),
+      list(id="00944", name="Flavone and flavonol biosynthesis"),
+      list(id="00942", name="Anthocyanin biosynthesis"),
+      list(id="00943", name="Isoflavonoid biosynthesis"),
+      list(id="00946", name="Degradation of flavonoids"),
+      list(id="00901", name="Indole alkaloid biosynthesis"),
+      list(id="00403", name="Indole diterpene alkaloid biosynthesis"),
+      list(id="00950", name="Isoquinoline alkaloid biosynthesis"),
+      list(id="00960", name="Tropane, piperidine and pyridine alkaloid biosynthesis"),
+      list(id="00232", name="Caffeine metabolism"),
+      list(id="00965", name="Betalain biosynthesis"),
+      list(id="00966", name="Glucosinolate biosynthesis"),
+      list(id="00311", name="Penicillin and cephalosporin biosynthesis"),
+      list(id="00332", name="Carbapenem biosynthesis"),
+      list(id="00261", name="Monobactam biosynthesis"),
+      list(id="00331", name="Clavulanic acid biosynthesis"),
+      list(id="00521", name="Streptomycin biosynthesis"),
+      list(id="00524", name="Neomycin, kanamycin and gentamicin biosynthesis"),
+      list(id="00525", name="Acarbose and validamycin biosynthesis"),
+      list(id="00401", name="Novobiocin biosynthesis"),
+      list(id="00333", name="Prodigiosin biosynthesis"),
+      list(id="00254", name="Aflatoxin biosynthesis"),
+      list(id="00975", name="Biosynthesis of various siderophores"),
+      list(id="00998", name="Biosynthesis of various antibiotics"),
+      list(id="00999", name="Biosynthesis of various plant secondary metabolites"),
+      list(id="00997", name="Biosynthesis of various other secondary metabolites")
+    ),
+    "1.11 Xenobiotics biodegradation" = list(
+      list(id="00362", name="Benzoate degradation"),
+      list(id="00627", name="Aminobenzoate degradation"),
+      list(id="00364", name="Fluorobenzoate degradation"),
+      list(id="00625", name="Chloroalkane and chloroalkene degradation"),
+      list(id="00361", name="Chlorocyclohexane and chlorobenzene degradation"),
+      list(id="00623", name="Toluene degradation"),
+      list(id="00622", name="Xylene degradation"),
+      list(id="00633", name="Nitrotoluene degradation"),
+      list(id="00642", name="Ethylbenzene degradation"),
+      list(id="00643", name="Styrene degradation"),
+      list(id="00791", name="Atrazine degradation"),
+      list(id="00930", name="Caprolactam degradation"),
+      list(id="00363", name="Bisphenol degradation"),
+      list(id="00621", name="Dioxin degradation"),
+      list(id="00626", name="Naphthalene degradation"),
+      list(id="00624", name="Polycyclic aromatic hydrocarbon degradation"),
+      list(id="00365", name="Furfural degradation"),
+      list(id="00984", name="Steroid degradation"),
+      list(id="00980", name="Metabolism of xenobiotics by cytochrome P450"),
+      list(id="00982", name="Drug metabolism - cytochrome P450"),
+      list(id="00983", name="Drug metabolism - other enzymes")
+    )
+  ),
+  "2. Genetic Information Processing" = list(
+    "2.1 Transcription" = list(
+      list(id="03020", name="RNA polymerase"),
+      list(id="03022", name="Basal transcription factors"),
+      list(id="03040", name="Spliceosome")
+    ),
+    "2.2 Translation" = list(
+      list(id="03010", name="Ribosome"),
+      list(id="00970", name="Aminoacyl-tRNA biosynthesis"),
+      list(id="03013", name="Nucleocytoplasmic transport"),
+      list(id="03015", name="mRNA surveillance pathway"),
+      list(id="03008", name="Ribosome biogenesis in eukaryotes")
+    ),
+    "2.3 Folding, sorting and degradation" = list(
+      list(id="03060", name="Protein export"),
+      list(id="04141", name="Protein processing in endoplasmic reticulum"),
+      list(id="04130", name="SNARE interactions in vesicular transport"),
+      list(id="04120", name="Ubiquitin mediated proteolysis"),
+      list(id="04122", name="Sulfur relay system"),
+      list(id="03050", name="Proteasome"),
+      list(id="03018", name="RNA degradation")
+    ),
+    "2.4 Replication and repair" = list(
+      list(id="03030", name="DNA replication"),
+      list(id="03410", name="Base excision repair"),
+      list(id="03420", name="Nucleotide excision repair"),
+      list(id="03430", name="Mismatch repair"),
+      list(id="03440", name="Homologous recombination"),
+      list(id="03450", name="Non-homologous end-joining"),
+      list(id="03460", name="Fanconi anemia pathway")
+    ),
+    "2.5 Chromosome" = list(
+      list(id="03082", name="ATP-dependent chromatin remodeling"),
+      list(id="03083", name="Polycomb repressive complex")
+    )
+  ),
+  "3. Environmental Information Processing" = list(
+    "3.1 Membrane transport" = list(
+      list(id="02010", name="ABC transporters"),
+      list(id="02060", name="Phosphotransferase system (PTS)"),
+      list(id="03070", name="Bacterial secretion system")
+    ),
+    "3.2 Signal transduction" = list(
+      list(id="02020", name="Two-component system"),
+      list(id="04010", name="MAPK signaling pathway"),
+      list(id="04011", name="MAPK signaling pathway - yeast"),
+      list(id="04013", name="MAPK signaling pathway - fly"),
+      list(id="04016", name="MAPK signaling pathway - plant"),
+      list(id="04012", name="ErbB signaling pathway"),
+      list(id="04014", name="Ras signaling pathway"),
+      list(id="04015", name="Rap1 signaling pathway"),
+      list(id="04310", name="Wnt signaling pathway"),
+      list(id="04330", name="Notch signaling pathway"),
+      list(id="04340", name="Hedgehog signaling pathway"),
+      list(id="04350", name="TGF-beta signaling pathway"),
+      list(id="04390", name="Hippo signaling pathway"),
+      list(id="04370", name="VEGF signaling pathway"),
+      list(id="04371", name="Apelin signaling pathway"),
+      list(id="04630", name="JAK-STAT signaling pathway"),
+      list(id="04064", name="NF-kappa B signaling pathway"),
+      list(id="04668", name="TNF signaling pathway"),
+      list(id="04066", name="HIF-1 signaling pathway"),
+      list(id="04068", name="FoxO signaling pathway"),
+      list(id="04020", name="Calcium signaling pathway"),
+      list(id="04070", name="Phosphatidylinositol signaling system"),
+      list(id="04072", name="Phospholipase D signaling pathway"),
+      list(id="04071", name="Sphingolipid signaling pathway"),
+      list(id="04024", name="cAMP signaling pathway"),
+      list(id="04022", name="cGMP-PKG signaling pathway"),
+      list(id="04151", name="PI3K-Akt signaling pathway"),
+      list(id="04152", name="AMPK signaling pathway"),
+      list(id="04150", name="mTOR signaling pathway"),
+      list(id="04075", name="Plant hormone signal transduction")
+    ),
+    "3.3 Signaling molecules and interaction" = list(
+      list(id="04080", name="Neuroactive ligand-receptor interaction"),
+      list(id="04060", name="Cytokine-cytokine receptor interaction"),
+      list(id="04061", name="Viral protein interaction with cytokine and cytokine receptor"),
+      list(id="04512", name="ECM-receptor interaction"),
+      list(id="04514", name="Cell adhesion molecules")
+    )
+  ),
+  "4. Cellular Processes" = list(
+    "4.1 Transport and catabolism" = list(
+      list(id="04144", name="Endocytosis"),
+      list(id="04145", name="Phagosome"),
+      list(id="04142", name="Lysosome"),
+      list(id="04146", name="Peroxisome"),
+      list(id="04140", name="Autophagy - animal"),
+      list(id="04138", name="Autophagy - yeast"),
+      list(id="04136", name="Autophagy - other"),
+      list(id="04137", name="Mitophagy - animal"),
+      list(id="04139", name="Mitophagy - yeast")
+    ),
+    "4.2 Cell growth and death" = list(
+      list(id="04110", name="Cell cycle"),
+      list(id="04111", name="Cell cycle - yeast"),
+      list(id="04112", name="Cell cycle - Caulobacter"),
+      list(id="04113", name="Meiosis - yeast"),
+      list(id="04114", name="Oocyte meiosis"),
+      list(id="04210", name="Apoptosis"),
+      list(id="04214", name="Apoptosis - fly"),
+      list(id="04215", name="Apoptosis - multiple species"),
+      list(id="04216", name="Ferroptosis"),
+      list(id="04217", name="Necroptosis"),
+      list(id="04115", name="p53 signaling pathway"),
+      list(id="04218", name="Cellular senescence")
+    ),
+    "4.3 Cellular community - eukaryotes" = list(
+      list(id="04510", name="Focal adhesion"),
+      list(id="04520", name="Adherens junction"),
+      list(id="04530", name="Tight junction"),
+      list(id="04540", name="Gap junction"),
+      list(id="04550", name="Signaling pathways regulating pluripotency of stem cells")
+    ),
+    "4.4 Cellular community - prokaryotes" = list(
+      list(id="02024", name="Quorum sensing"),
+      list(id="05111", name="Biofilm formation - Vibrio cholerae"),
+      list(id="02025", name="Biofilm formation - Pseudomonas aeruginosa"),
+      list(id="02026", name="Biofilm formation - Escherichia coli")
+    ),
+    "4.5 Cell motility" = list(
+      list(id="02030", name="Bacterial chemotaxis"),
+      list(id="02040", name="Flagellar assembly"),
+      list(id="04814", name="Motor proteins"),
+      list(id="04810", name="Regulation of actin cytoskeleton")
+    )
+  ),
+  "5. Organismal Systems" = list(
+    "5.1 Immune system" = list(
+      list(id="04640", name="Hematopoietic cell lineage"),
+      list(id="04610", name="Complement and coagulation cascades"),
+      list(id="04611", name="Platelet activation"),
+      list(id="04613", name="Neutrophil extracellular trap formation"),
+      list(id="04620", name="Toll-like receptor signaling pathway"),
+      list(id="04621", name="NOD-like receptor signaling pathway"),
+      list(id="04622", name="RIG-I-like receptor signaling pathway"),
+      list(id="04623", name="Cytosolic DNA-sensing pathway"),
+      list(id="04625", name="C-type lectin receptor signaling pathway"),
+      list(id="04650", name="Natural killer cell mediated cytotoxicity"),
+      list(id="04612", name="Antigen processing and presentation"),
+      list(id="04660", name="T cell receptor signaling pathway"),
+      list(id="04658", name="Th1 and Th2 cell differentiation"),
+      list(id="04659", name="Th17 cell differentiation"),
+      list(id="04657", name="IL-17 signaling pathway"),
+      list(id="04662", name="B cell receptor signaling pathway"),
+      list(id="04664", name="Fc epsilon RI signaling pathway"),
+      list(id="04666", name="Fc gamma R-mediated phagocytosis"),
+      list(id="04670", name="Leukocyte transendothelial migration"),
+      list(id="04062", name="Chemokine signaling pathway")
+    ),
+    "5.2 Endocrine system" = list(
+      list(id="04911", name="Insulin secretion"),
+      list(id="04910", name="Insulin signaling pathway"),
+      list(id="04922", name="Glucagon signaling pathway"),
+      list(id="04920", name="Adipocytokine signaling pathway"),
+      list(id="03320", name="PPAR signaling pathway"),
+      list(id="04912", name="GnRH signaling pathway"),
+      list(id="04915", name="Estrogen signaling pathway"),
+      list(id="04914", name="Progesterone-mediated oocyte maturation"),
+      list(id="04917", name="Prolactin signaling pathway"),
+      list(id="04921", name="Oxytocin signaling pathway"),
+      list(id="04918", name="Thyroid hormone synthesis"),
+      list(id="04919", name="Thyroid hormone signaling pathway")
+    ),
+    "5.3 Circulatory system" = list(
+      list(id="04260", name="Cardiac muscle contraction"),
+      list(id="04261", name="Adrenergic signaling in cardiomyocytes"),
+      list(id="04270", name="Vascular smooth muscle contraction")
+    ),
+    "5.4 Digestive system" = list(
+      list(id="04970", name="Salivary secretion"),
+      list(id="04971", name="Gastric acid secretion"),
+      list(id="04972", name="Pancreatic secretion"),
+      list(id="04976", name="Bile secretion"),
+      list(id="04973", name="Carbohydrate digestion and absorption"),
+      list(id="04974", name="Protein digestion and absorption"),
+      list(id="04975", name="Fat digestion and absorption"),
+      list(id="04979", name="Cholesterol metabolism")
+    ),
+    "5.5 Excretory system" = list(
+      list(id="04960", name="Aldosterone-regulated sodium reabsorption"),
+      list(id="04961", name="Endocrine and other factor-regulated calcium reabsorption"),
+      list(id="04962", name="Vasopressin-regulated water reabsorption"),
+      list(id="04964", name="Proximal tubule bicarbonate reclamation"),
+      list(id="04966", name="Collecting duct acid secretion")
+    ),
+    "5.6 Nervous system" = list(
+      list(id="04726", name="Serotonergic synapse"),
+      list(id="04727", name="GABAergic synapse"),
+      list(id="04725", name="Cholinergic synapse"),
+      list(id="04728", name="Dopaminergic synapse"),
+      list(id="04724", name="Glutamatergic synapse"),
+      list(id="04723", name="Retrograde endocannabinoid signaling"),
+      list(id="04720", name="Long-term potentiation"),
+      list(id="04730", name="Long-term depression"),
+      list(id="04722", name="Neurotrophin signaling pathway")
+    ),
+    "5.7 Sensory system" = list(
+      list(id="04744", name="Phototransduction"),
+      list(id="04740", name="Olfactory transduction"),
+      list(id="04742", name="Taste transduction")
+    ),
+    "5.8 Development and regeneration" = list(
+      list(id="04360", name="Axon guidance"),
+      list(id="04380", name="Osteoclast differentiation")
+    ),
+    "5.9 Aging" = list(
+      list(id="04211", name="Longevity regulating pathway"),
+      list(id="04213", name="Longevity regulating pathway - multiple species")
+    ),
+    "5.10 Environmental adaptation" = list(
+      list(id="04710", name="Circadian rhythm"),
+      list(id="04713", name="Circadian entrainment"),
+      list(id="04711", name="Circadian rhythm - fly"),
+      list(id="04714", name="Thermogenesis")
+    )
+  ),
+  "6. Human Diseases" = list(
+    "6.1 Cancer: overview" = list(
+      list(id="05200", name="Pathways in cancer"),
+      list(id="05202", name="Transcriptional misregulation in cancer"),
+      list(id="05206", name="MicroRNAs in cancer"),
+      list(id="05205", name="Proteoglycans in cancer"),
+      list(id="05230", name="Central carbon metabolism in cancer"),
+      list(id="05231", name="Choline metabolism in cancer")
+    ),
+    "6.2 Cancer: specific types" = list(
+      list(id="05210", name="Colorectal cancer"),
+      list(id="05212", name="Pancreatic cancer"),
+      list(id="05225", name="Hepatocellular carcinoma"),
+      list(id="05226", name="Gastric cancer"),
+      list(id="05214", name="Glioma"),
+      list(id="05216", name="Thyroid cancer"),
+      list(id="05221", name="Acute myeloid leukemia"),
+      list(id="05220", name="Chronic myeloid leukemia"),
+      list(id="05218", name="Melanoma"),
+      list(id="05211", name="Renal cell carcinoma"),
+      list(id="05219", name="Bladder cancer"),
+      list(id="05215", name="Prostate cancer"),
+      list(id="05213", name="Endometrial cancer"),
+      list(id="05224", name="Breast cancer"),
+      list(id="05222", name="Small cell lung cancer"),
+      list(id="05223", name="Non-small cell lung cancer")
+    ),
+    "6.3 Immune diseases" = list(
+      list(id="05310", name="Asthma"),
+      list(id="05322", name="Systemic lupus erythematosus"),
+      list(id="05323", name="Rheumatoid arthritis"),
+      list(id="05320", name="Autoimmune thyroid disease"),
+      list(id="05321", name="Inflammatory bowel disease"),
+      list(id="05330", name="Allograft rejection"),
+      list(id="05332", name="Graft-versus-host disease")
+    ),
+    "6.4 Neurodegenerative diseases" = list(
+      list(id="05010", name="Alzheimer disease"),
+      list(id="05012", name="Parkinson disease"),
+      list(id="05014", name="Amyotrophic lateral sclerosis"),
+      list(id="05016", name="Huntington disease"),
+      list(id="05017", name="Spinocerebellar ataxia"),
+      list(id="05020", name="Prion disease")
+    ),
+    "6.5 Substance dependence" = list(
+      list(id="05030", name="Cocaine addiction"),
+      list(id="05031", name="Amphetamine addiction"),
+      list(id="05032", name="Morphine addiction"),
+      list(id="05033", name="Nicotine addiction"),
+      list(id="05034", name="Alcoholism")
+    ),
+    "6.6 Cardiovascular diseases" = list(
+      list(id="05418", name="Fluid shear stress and atherosclerosis"),
+      list(id="05410", name="Hypertrophic cardiomyopathy"),
+      list(id="05412", name="Arrhythmogenic right ventricular cardiomyopathy"),
+      list(id="05414", name="Dilated cardiomyopathy")
+    ),
+    "6.7 Infectious diseases: bacterial" = list(
+      list(id="05120", name="Epithelial cell signaling in Helicobacter pylori infection"),
+      list(id="05130", name="Pathogenic Escherichia coli infection"),
+      list(id="05132", name="Salmonella infection"),
+      list(id="05131", name="Shigellosis"),
+      list(id="05135", name="Yersinia infection"),
+      list(id="05133", name="Pertussis"),
+      list(id="05134", name="Legionellosis"),
+      list(id="05150", name="Staphylococcus aureus infection"),
+      list(id="05152", name="Tuberculosis"),
+      list(id="05100", name="Bacterial invasion of epithelial cells")
+    ),
+    "6.8 Infectious diseases: viral" = list(
+      list(id="05166", name="Human T-cell leukemia virus 1 infection"),
+      list(id="05170", name="Human immunodeficiency virus 1 infection"),
+      list(id="05161", name="Hepatitis B"),
+      list(id="05160", name="Hepatitis C"),
+      list(id="05171", name="Coronavirus disease - COVID-19"),
+      list(id="05164", name="Influenza A"),
+      list(id="05162", name="Measles"),
+      list(id="05168", name="Herpes simplex virus 1 infection"),
+      list(id="05163", name="Human cytomegalovirus infection"),
+      list(id="05169", name="Epstein-Barr virus infection"),
+      list(id="05165", name="Human papillomavirus infection")
+    ),
+    "6.9 Infectious diseases: parasitic" = list(
+      list(id="05140", name="Leishmaniasis"),
+      list(id="05142", name="Chagas disease"),
+      list(id="05143", name="African trypanosomiasis"),
+      list(id="05144", name="Malaria"),
+      list(id="05145", name="Toxoplasmosis"),
+      list(id="05146", name="Amoebiasis")
+    )
+  )
+)
 ui <- page_navbar(
   title = "SQMxplore",
   theme = sqm_theme,
@@ -405,6 +1750,45 @@ ui <- page_navbar(
         card_header(div(style = "display:flex; justify-content:space-between; align-items:center;",
           span("Krona Chart"), uiOutput("krona_badge_ui"))),
         card_body(class = "p-0", uiOutput("krona_view_ui"))
+      )
+    )
+  ),
+  nav_panel("Pathways",
+    layout_sidebar(
+      sidebar = sidebar(width = 270,
+        uiOutput("pw_pathview_check_ui"),
+        tags$hr(class = "section-divider"),
+        tags$div(class = "sidebar-box",
+          tags$div(class = "form-label", "KEGG Pathway"),
+          uiOutput("pw_pathway_select_ui"),
+          tags$div(class = "form-label", style = "margin-top:4px;", "Count type"),
+          selectInput("pw_count", NULL,
+            choices = c("Copy number" = "copy_number", "TPM" = "tpm",
+                        "Raw abundances" = "abund", "Percentages" = "percent",
+                        "Base counts" = "bases"),
+            selected = "copy_number")
+        ),
+        tags$div(class = "sidebar-box",
+          tags$div(class = "form-label", "Mode"),
+          radioButtons("pw_mode", NULL,
+            choices = c("All samples together" = "together",
+                        "One per sample"       = "split",
+                        "Fold-change"          = "foldchange"),
+            selected = "together"),
+          uiOutput("pw_foldchange_ui")
+        ),
+        tags$div(class = "sidebar-box",
+          checkboxInput("pw_log_scale", "Log scale", value = FALSE)
+        ),
+        tags$hr(class = "section-divider"),
+        actionButton("do_pathway", "Generate map", class = "btn-primary w-100 mt-1"),
+        tags$div(style = "margin-top:5px;", uiOutput("pw_download_ui")),
+        tags$div(style = "margin-top:10px;", uiOutput("pw_status_ui"))
+      ),
+      card(
+        card_header(div(style = "display:flex; justify-content:space-between; align-items:center;",
+          span("KEGG Pathway Map"), uiOutput("pw_badge_ui"))),
+        card_body(class = "p-2", uiOutput("pw_view_ui"))
       )
     )
   )
@@ -590,6 +1974,7 @@ server <- function(input, output, session) {
       is_sqm <- grepl("SqueezeMeta", creator_name() %||% "", ignore.case = TRUE)
       proj <- if (is_sqm) loadSQM(tp) else loadSQMlite(tp)
       sqm_data(proj); is_sqm_full(is_sqm); status("ready")
+
 
 
     }, error = function(e) { status("error"); showNotification(paste("Error:", e$message), type = "error", duration = 8) })
@@ -1229,6 +2614,425 @@ server <- function(input, output, session) {
   output$download_krona <- downloadHandler(
     filename = function() paste0("krona_",Sys.Date(),".html"),
     content  = function(file) { kf<-krona_file(); req(kf,file.exists(kf)); file.copy(kf,file) }
+  )
+
+  # ═══════════════════════════════════════════════════════
+  # Pathways tab — exportPathway (SQMtools wrapper for pathview)
+  # ═══════════════════════════════════════════════════════
+  pw_status   <- reactiveVal("idle")   # idle | generating | ready | error
+  pw_img_dir   <- reactiveVal(NULL)     # tempdir where PNGs were written
+  pw_img_files <- reactiveVal(NULL)    # character vector of PNG paths
+  pw_legend    <- reactiveVal(NULL)    # list: colors, min, max, log_sc, cnt, fc
+  pw_pathway_choices <- reactiveVal(NULL)  # named vector: "Name [id]" = "id"
+
+  # ── Pathway tree is static; just signal ready on project load ──
+  observeEvent(sqm_data(), {
+    req(sqm_data())
+    pw_pathway_choices(TRUE)   # just a flag to trigger renderUI
+  })
+
+  # ── Pathway selector: populated on project load ──
+  output$pw_pathway_select_ui <- renderUI({
+    # Show placeholder if project not loaded
+    if (is.null(pw_pathway_choices()) || is.null(sqm_data())) {
+      return(tags$div(style="font-size:0.78rem; color:var(--muted); padding:4px 0;",
+        "Load a project to browse pathways."))
+    }
+
+    # Build collapsible tree from KEGG_HIERARCHY
+    # Uses HTML details/summary — no JS needed
+    search_box <- tags$input(
+      id = "pw_search", type = "text",
+      placeholder = "Search pathway\u2026",
+      oninput = "filterPwTree(this.value)",
+      style = paste0(
+        "width:100%; box-sizing:border-box; padding:3px 6px;",
+        "font-size:0.78rem; border:1px solid var(--border);",
+        "border-radius:4px; margin-bottom:6px;",
+        "background:var(--surface); color:var(--text);"))
+
+    # Build tree HTML
+    tree_items <- lapply(names(KEGG_HIERARCHY), function(l1) {
+      l2_items <- lapply(names(KEGG_HIERARCHY[[l1]]), function(l2) {
+        pathways <- KEGG_HIERARCHY[[l1]][[l2]]
+        pw_links <- lapply(pathways, function(pw) {
+          tags$div(
+            class = "pw-item",
+            "data-id" = pw$id,
+            "data-name" = tolower(paste(pw$name, pw$id)),
+            style = "padding:2px 4px 2px 8px; cursor:pointer; font-size:0.75rem; border-radius:3px;",
+            onclick = sprintf(
+              "Shiny.setInputValue('pw_pathway_id','%s',{priority:'event'}); document.querySelectorAll('.pw-item').forEach(function(el){el.style.background=''}); this.style.background='var(--accent-light)'; document.getElementById('pw_selected_label').textContent='%s [%s]';",
+              pw$id, gsub("'", "\\\\'", pw$name), pw$id),
+            tags$span(style="color:var(--muted); margin-right:4px; font-family:monospace;", pw$id),
+            pw$name
+          )
+        })
+        tags$details(
+          style = "margin-left:8px;",
+          tags$summary(
+            style = paste0(
+              "font-size:0.75rem; font-weight:600; color:var(--muted);",
+              "cursor:pointer; padding:2px 2px; list-style:none;",
+              "display:flex; align-items:center; gap:4px;"),
+            tags$span(class="pw-chevron", style="font-size:0.6rem;", "\u25b6"),
+            l2
+          ),
+          pw_links
+        )
+      })
+      tags$details(
+        open = NA,  # start closed
+        style = "margin-bottom:2px;",
+        tags$summary(
+          style = paste0(
+            "font-size:0.8rem; font-weight:700; color:var(--text);",
+            "cursor:pointer; padding:3px 2px; list-style:none;",
+            "display:flex; align-items:center; gap:4px;",
+            "border-bottom:1px solid var(--border);"),
+          tags$span(class="pw-chevron", style="font-size:0.65rem;", "\u25b6"),
+          l1
+        ),
+        l2_items
+      )
+    })
+
+    selected_label <- tags$div(
+      id = "pw_selected_label",
+      style = paste0(
+        "font-size:0.75rem; color:var(--muted); font-style:italic;",
+        "margin-bottom:4px; min-height:1.2em;"),
+      if (!is.null(input$pw_pathway_id) && nchar(input$pw_pathway_id) > 0)
+        paste0("Selected: ", input$pw_pathway_id)
+      else
+        "None selected"
+    )
+
+    tree_css <- tags$style(HTML(
+      "details[open] > summary .pw-chevron { transform: rotate(90deg); }
+       .pw-item:hover { background: var(--accent-light) !important; }
+       details > summary { outline: none; }
+       details > summary::-webkit-details-marker { display: none; }"
+    ))
+
+    search_js <- tags$script(HTML(
+      "function filterPwTree(q) {
+        q = q.toLowerCase().trim();
+        document.querySelectorAll('.pw-item').forEach(function(el) {
+          var match = !q || el.getAttribute('data-name').includes(q);
+          el.style.display = match ? '' : 'none';
+        });
+        document.querySelectorAll('details').forEach(function(d) {
+          var vis = Array.from(d.querySelectorAll('.pw-item')).some(function(el) {
+            return el.style.display !== 'none';
+          });
+          d.style.display = vis ? '' : 'none';
+          if (q && vis) d.open = true;
+          else if (!q) { d.style.display = ''; }
+        });
+      }"
+    ))
+
+    tagList(
+      tree_css,
+      search_box,
+      selected_label,
+      tags$div(
+        style = paste0(
+          "max-height:320px; overflow-y:auto; border:1px solid var(--border);",
+          "border-radius:4px; padding:4px; background:var(--surface);"),
+        tree_items
+      ),
+      search_js
+    )
+  })
+
+  pathview_available <- reactive({
+    requireNamespace("pathview", quietly = TRUE)
+  })
+
+  output$pw_pathview_check_ui <- renderUI({
+    if (pathview_available()) {
+      tags$div(style = "font-size:0.82rem; padding:6px 0;",
+        tags$span(style = "color:#1a9e6e; margin-right:5px;", "\u2714"),
+        tags$span(style = "color:#7a90a8;", "pathview: "),
+        tags$span(style = "color:#1a9e6e; font-weight:600;", "available"))
+    } else {
+      tags$div(style = "font-size:0.82rem; padding:6px 0;",
+        tags$span(style = "color:#c0392b; margin-right:5px;", "\u2715"),
+        tags$span(style = "color:#7a90a8;", "pathview: "),
+        tags$span(style = "color:#c0392b; font-weight:600;", "NOT FOUND"),
+        tags$div(class = "path-info", style = "margin-top:4px; color:#c0392b;",
+          "Install with: ",
+          tags$code(style = "font-size:0.75rem;",
+            'BiocManager::install("pathview")'))
+      )
+    }
+  })
+
+  # Show fold-change group pickers only in foldchange mode
+  output$pw_foldchange_ui <- renderUI({
+    req(input$pw_mode == "foldchange")
+    req(sqm_data())
+    samples <- tryCatch(sqm_data()$samples, error = function(e) NULL)
+    req(samples)
+    tagList(
+      tags$div(class = "form-label", style = "margin-top:6px;", "Group A (reference)"),
+      checkboxGroupInput("pw_fc_groupA", NULL, choices = samples,
+                         selected = samples[1]),
+      tags$div(class = "form-label", style = "margin-top:4px;", "Group B"),
+      checkboxGroupInput("pw_fc_groupB", NULL, choices = samples,
+                         selected = if (length(samples) > 1) samples[2] else samples[1])
+    )
+  })
+
+  observeEvent(input$do_pathway, {
+    req(sqm_data())
+    if (!pathview_available()) {
+      showNotification(
+        'pathview not installed. Run: BiocManager::install("pathview")',
+        type = "error", duration = 10)
+      return()
+    }
+    pid <- trimws(input$pw_pathway_id %||% "")
+    if (nchar(pid) == 0) {
+      showNotification("Please select a KEGG Pathway from the dropdown.", type = "warning", duration=6)
+      return()
+    }
+    pw_status("generating"); pw_img_files(NULL)
+
+    tryCatch({
+      proj   <- sqm_data()
+      outdir <- file.path(tempdir(), paste0("sqmxplore_pw_", format(Sys.time(), "%Y%m%d%H%M%S")))
+      dir.create(outdir, showWarnings = FALSE)
+
+      mode    <- input$pw_mode
+      log_sc  <- isTRUE(input$pw_log_scale)
+      cnt     <- input$pw_count %||% "copy_number"
+      fc_grps <- NULL
+      if (mode == "foldchange") {
+        grpA <- input$pw_fc_groupA; grpB <- input$pw_fc_groupB
+        if (length(grpA) == 0 || length(grpB) == 0) {
+          showNotification("Select at least one sample for each fold-change group.",
+                           type = "warning", duration = 6)
+          pw_status("idle"); return()
+        }
+        fc_grps <- list(grpA, grpB)
+      }
+
+      # Pre-compute sample colors so map and legend are consistent
+      smp_for_colors <- tryCatch(proj$misc$samples, error=function(e) character(0))
+      if (is.null(smp_for_colors) || length(smp_for_colors)==0)
+        smp_for_colors <- tryCatch(colnames(proj$functions$KEGG$abund), error=function(e) character(0))
+      n_smp_ep <- length(smp_for_colors)
+      auto_cols <- if (n_smp_ep == 1) "#E41A1C" else
+        hcl(h = seq(15, 375, length.out = n_smp_ep + 1)[seq_len(n_smp_ep)], c = 100, l = 55)
+
+      exportPathway(
+        proj,
+        pathway_id         = pid,
+        count              = cnt,
+        split_samples      = (mode == "split"),
+        log_scale          = log_sc,
+        fold_change_groups = fc_grps,
+        sample_colors      = if (mode != "foldchange") auto_cols else NULL,
+        output_dir         = outdir,
+        output_suffix      = paste0("sqmxplore_", pid)
+      )
+
+      # Collect PNGs written by pathview (exclude legends)
+      pngs_all <- list.files(outdir, pattern = "[.]png$", full.names = TRUE)
+      pngs_all <- pngs_all[!grepl("[.]legend[.]", basename(pngs_all))]
+
+      if (length(pngs_all) == 0) {
+        pw_status("error")
+        showNotification(
+          paste0("No images were generated for pathway ", pid,
+                 ". Check that the pathway ID is valid and has KEGG KO annotations."),
+          type = "error", duration = 10)
+      } else {
+        # Compute legend info from the same parameters used in exportPathway
+        samples_used <- tryCatch(proj$misc$samples, error=function(e) character(0))
+        if (is.null(samples_used) || length(samples_used)==0) samples_used <- tryCatch(colnames(proj$functions$KEGG$abund), error=function(e) character(0))
+        n_smp  <- length(samples_used)
+        s_cols <- auto_cols  # reuse colors computed for exportPathway call
+        # Compute min/max from KEGG data (same logic as exportPathway)
+        mat <- tryCatch({
+          if (cnt == "percent") {
+            100 * t(t(proj$functions$KEGG$abund) / proj$total_reads)
+          } else {
+            proj$functions$KEGG[[cnt]]
+          }
+        }, error = function(e) NULL)
+        if (!is.null(mat) && mode == "foldchange" && !is.null(fc_grps)) {
+          ps  <- 0.001
+          mat <- mat + ps
+          log2FC <- log(apply(mat[, fc_grps[[2]], drop=FALSE], 1, median) /
+                        apply(mat[, fc_grps[[1]], drop=FALSE], 1, median), 2)
+          mv <- max(abs(log2FC), na.rm=TRUE)
+          leg_min <- -mv; leg_max <- mv; leg_log <- FALSE
+        } else if (!is.null(mat)) {
+          if (log_sc) mat <- log(mat + 0.001, 10)
+          leg_min <- min(mat, na.rm=TRUE); leg_max <- max(mat, na.rm=TRUE); leg_log <- log_sc
+        } else {
+          leg_min <- 0; leg_max <- 1; leg_log <- log_sc
+        }
+        pw_legend(list(
+          colors  = s_cols,
+          samples = samples_used,
+          min     = leg_min,
+          max     = leg_max,
+          log_sc  = leg_log,
+          cnt     = cnt,
+          mode    = mode,
+          fc_grps = fc_grps
+        ))
+        pw_img_dir(outdir)
+        pw_img_files(pngs_all)
+        pw_status("ready")
+      }
+    }, error = function(e) {
+      pw_status("error")
+      showNotification(paste("Pathway error:", e$message), type = "error", duration = 12)
+    })
+  })
+
+  output$pw_view_ui <- renderUI({
+    s <- pw_status()
+    if (s == "idle") return(
+      tags$div(style = "color:var(--muted); font-size:0.85rem; padding:2rem; text-align:center;",
+        tags$div(style = "font-size:2rem; margin-bottom:8px;", "\U0001f5fa\ufe0f"),
+        tags$div("Enter a KEGG Pathway ID and click ",
+                 tags$strong("Generate map"), "."),
+        tags$div(style = "margin-top:6px; font-size:0.78rem;",
+          "Example IDs: 00910 (Nitrogen), 00630 (Glyoxylate), 01100 (Metabolic pathways)")))
+    if (s == "generating") return(
+      tags$div(style = "color:var(--muted); font-size:0.85rem; padding:2rem; text-align:center;",
+        tags$div(style = "font-size:1.5rem; margin-bottom:8px;", "\u25cc"),
+        tags$div("Generating pathway map\u2026 (downloading map from KEGG servers)")))
+    if (s == "error") return(
+      tags$div(style = "color:#c0392b; font-size:0.85rem; padding:2rem; text-align:center;",
+        tags$div(style = "font-size:1.5rem; margin-bottom:8px;", "\u2715"),
+        tags$div("Generation failed. See notification for details.")))
+    # ready
+    imgs    <- pw_img_files(); req(imgs)
+    out_dir <- pw_img_dir()
+    leg     <- pw_legend()
+    # Serve the output dir as a static resource
+    res_name <- paste0("pw_", basename(out_dir))
+    addResourcePath(res_name, out_dir)
+    img_tags <- lapply(imgs, function(f) {
+      fname <- basename(f)
+      tags$div(style = "margin-bottom:12px;",
+        tags$img(
+          src   = paste0(res_name, "/", fname),
+          style = "max-width:100%; border:1px solid var(--border); border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,.08);",
+          alt   = fname
+        )
+      )
+    })
+
+    # ── Inline legend ──
+    cnt_labels <- c(abund="Raw abundance", percent="Percentage", bases="Bases",
+                    tpm="TPM", copy_number="Copy number")
+    cnt_lbl <- if (!is.null(leg) && leg$cnt %in% names(cnt_labels))
+                 cnt_labels[leg$cnt] else leg$cnt
+
+    legend_ui <- if (!is.null(leg)) {
+      fmt_val <- function(v) {
+        if (!is.null(leg$log_sc) && leg$log_sc) paste0("10^", round(v, 2))
+        else formatC(v, digits=3, format="g")
+      }
+      if (leg$mode == "foldchange" && !is.null(leg$fc_grps)) {
+        fc_colors <- c("red", "green")
+        grad <- paste0("linear-gradient(to top, ", fc_colors[1], ", white, ", fc_colors[2], ")")
+        tags$div(style="display:flex; align-items:flex-start; gap:12px;",
+          tags$div(style="display:flex; align-items:stretch; gap:4px;",
+            tags$div(style="display:flex; flex-direction:column; justify-content:space-between; font-size:0.65rem; color:var(--muted); text-align:right; height:120px;",
+              tags$span(fmt_val(leg$max)), tags$span("0"), tags$span(fmt_val(leg$min))),
+            tags$div(style=paste0("width:18px; height:120px; border-radius:3px; border:1px solid var(--border); background:", grad, ";"))
+          ),
+          tags$div(style="font-size:0.72rem; color:var(--muted); padding-top:4px;",
+            tags$div(paste0("Log2FC ", cnt_lbl)),
+            tags$div(style="margin-top:8px;",
+              tags$span(style=paste0("display:inline-block;width:10px;height:10px;background:", fc_colors[2], ";border-radius:2px;margin-right:4px;")),
+              "Group B > Group A"),
+            tags$div(style="margin-top:4px;",
+              tags$span(style=paste0("display:inline-block;width:10px;height:10px;background:", fc_colors[1], ";border-radius:2px;margin-right:4px;")),
+              "Group A > Group B")
+          )
+        )
+      } else {
+        # Shared numeric scale, one color bar per sample
+        n_ticks <- 5
+        tick_vals <- seq(leg$max, leg$min, length.out = n_ticks)
+        bar_tags <- lapply(seq_along(leg$colors), function(i) {
+          col <- leg$colors[i]
+          grad <- paste0("linear-gradient(to top, white, ", col, ")")
+          tags$div(style="display:flex; flex-direction:column; align-items:center; gap:3px;",
+            tags$div(style=paste0("width:14px; height:120px; border-radius:3px; border:1px solid var(--border); background:", grad, ";")),
+            tags$div(style="font-size:0.65rem; color:var(--muted); max-width:50px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;",
+              leg$samples[i])
+          )
+        })
+        tags$div(style="display:flex; align-items:flex-start; gap:6px;",
+          tags$div(style="display:flex; flex-direction:column; justify-content:space-between; font-size:0.65rem; color:var(--muted); text-align:right; height:120px; padding-right:3px;",
+            lapply(tick_vals, function(v) tags$span(fmt_val(v)))),
+          tags$div(style="display:flex; gap:4px; align-items:flex-start;", bar_tags),
+          tags$div(style="font-size:0.72rem; color:var(--muted); padding-top:4px; padding-left:4px;",
+            cnt_lbl,
+            if (!is.null(leg$log_sc) && leg$log_sc) " (log10)" else "")
+        )
+      }
+    } else NULL
+
+    tags$div(style="padding:8px;",
+      img_tags,
+      if (!is.null(legend_ui))
+        tags$div(style="margin-top:8px; padding:10px; background:var(--surface); border:1px solid var(--border); border-radius:6px;",
+          legend_ui)
+    )
+  })
+
+  output$pw_status_ui <- renderUI({
+    s <- pw_status()
+    col <- switch(s, idle="#7a90a8", generating="#3b9ede", ready="#1a9e6e", error="#c0392b")
+    ico <- switch(s, idle="\u25cb", generating="\u25cc", ready="\u25cf", error="\u2715")
+    lbl <- switch(s, idle="IDLE", generating="GENERATING\u2026", ready="READY", error="ERROR")
+    tags$div(style = "font-size:0.8rem;",
+      tags$span(style = paste0("color:", col, "; margin-right:5px;"), ico),
+      tags$span(style = "color:#7a90a8;", "Status: "),
+      tags$span(style = paste0("color:", col, "; font-weight:600;"), lbl))
+  })
+
+  output$pw_badge_ui <- renderUI({
+    s <- pw_status()
+    if (s == "ready")
+      tags$span(class="badge",
+        style="background:rgba(26,158,110,0.1);color:#1a9e6e;font-size:0.72rem;border:1px solid rgba(26,158,110,0.3);",
+        "\u25cf Ready")
+    else if (s == "generating")
+      tags$span(class="badge",
+        style="background:rgba(59,158,222,0.1);color:#3b9ede;font-size:0.72rem;border:1px solid rgba(59,158,222,0.3);",
+        "\u25cc Generating\u2026")
+    else
+      tags$span(class="badge",
+        style="background:#eef2f7;color:#7a90a8;font-size:0.72rem;border:1px solid #d0dae6;",
+        "No map")
+  })
+
+  output$pw_download_ui <- renderUI({
+    req(pw_status() == "ready")
+    downloadButton("download_pw_zip", "Download PNGs (.zip)",
+                   class = "btn-outline-secondary w-100")
+  })
+
+  output$download_pw_zip <- downloadHandler(
+    filename = function() paste0("pathway_", trimws(input$pw_pathway_id), "_", Sys.Date(), ".zip"),
+    content  = function(file) {
+      imgs <- pw_img_files(); req(imgs)
+      zip(file, files = imgs, flags = "-j")  # -j: junk paths, filenames only
+    }
   )
 }
 shinyApp(ui = ui, server = server)
