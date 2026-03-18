@@ -323,6 +323,20 @@ avail_bins <- function(proj) {
   tbl <- tryCatch(proj$bins$table, error = function(e) NULL)
   if (has_data(tbl)) c("Bins" = "bins") else c()
 }
+avail_tax_metrics <- function(proj, rank) {
+  all_m <- c("Percentages (percent)"   = "percent",
+             "Raw abundances (abund)"  = "abund")
+  Filter(function(m) tryCatch(has_data(proj$taxa[[rank]][[m]]), error=function(e) FALSE), all_m)
+}
+avail_fun_metrics <- function(proj, db) {
+  all_m <- c("Raw abundances (abund)"    = "abund",
+             "Percentages (percent)"     = "percent",
+             "Base counts (bases)"       = "bases",
+             "CPM (cpm)"                 = "cpm",
+             "TPM (tpm)"                 = "tpm",
+             "Copy number (copy_number)" = "copy_number")
+  Filter(function(m) tryCatch(has_data(proj$functions[[db]][[m]]), error=function(e) FALSE), all_m)
+}
 ui <- page_navbar(
   title = "SQMxplore",
   theme = sqm_theme,
@@ -433,14 +447,33 @@ server <- function(input, output, session) {
     make_table_box("Assembly", "tbl_assembly", ch)
   })
   output$tbl_taxonomy_ui <- renderUI({
-    req(sqm_data())
-    ch <- avail_taxonomy(sqm_data())
-    make_table_box("Taxonomy", "tbl_taxonomy", ch)
+    req(sqm_data()); proj <- sqm_data()
+    ch <- avail_taxonomy(proj)
+    if (length(ch) == 0) return(NULL)
+    # Default rank for metric detection
+    rank0 <- sub("^tax_", "", ch[[1]])
+    metrics <- avail_tax_metrics(proj, rank0)
+    tags$div(class = "sidebar-box", style = "margin-bottom:6px;",
+      tags$div(class = "form-label", "Taxonomy"),
+      selectInput("tbl_taxonomy", NULL, choices = ch),
+      tags$div(class = "form-label", style = "margin-top:4px;", "Metric"),
+      selectInput("tbl_tax_metric", NULL, choices = metrics,
+                  selected = if ("percent" %in% metrics) "percent" else metrics[[1]])
+    )
   })
   output$tbl_functions_ui <- renderUI({
-    req(sqm_data())
-    ch <- avail_functions(sqm_data())
-    make_table_box("Functions", "tbl_functions", ch)
+    req(sqm_data()); proj <- sqm_data()
+    ch <- avail_functions(proj)
+    if (length(ch) == 0) return(NULL)
+    db0 <- toupper(sub("^fun_", "", ch[[1]]))
+    metrics <- avail_fun_metrics(proj, db0)
+    tags$div(class = "sidebar-box", style = "margin-bottom:6px;",
+      tags$div(class = "form-label", "Functions"),
+      selectInput("tbl_functions", NULL, choices = ch),
+      tags$div(class = "form-label", style = "margin-top:4px;", "Metric"),
+      selectInput("tbl_fun_metric", NULL, choices = metrics,
+                  selected = if ("abund" %in% metrics) "abund" else metrics[[1]])
+    )
   })
   output$tbl_bins_ui <- renderUI({
     req(sqm_data())
@@ -460,10 +493,28 @@ server <- function(input, output, session) {
 
   observeEvent(input$tbl_assembly,  ignoreNULL=TRUE, ignoreInit=TRUE,
     { active_tbl_rv(input$tbl_assembly) })
-  observeEvent(input$tbl_taxonomy,  ignoreNULL=TRUE, ignoreInit=TRUE,
-    { active_tbl_rv(input$tbl_taxonomy) })
-  observeEvent(input$tbl_functions, ignoreNULL=TRUE, ignoreInit=TRUE,
-    { active_tbl_rv(input$tbl_functions) })
+  observeEvent(input$tbl_taxonomy,  ignoreNULL=TRUE, ignoreInit=TRUE, {
+    active_tbl_rv(input$tbl_taxonomy)
+    # Update metric choices for new rank
+    proj <- sqm_data(); req(proj)
+    rank <- sub("^tax_", "", input$tbl_taxonomy)
+    metrics <- avail_tax_metrics(proj, rank)
+    cur <- isolate(input$tbl_tax_metric)
+    sel <- if (!is.null(cur) && cur %in% metrics) cur else
+           if ("percent" %in% metrics) "percent" else metrics[[1]]
+    updateSelectInput(session, "tbl_tax_metric", choices = metrics, selected = sel)
+  })
+  observeEvent(input$tbl_functions, ignoreNULL=TRUE, ignoreInit=TRUE, {
+    active_tbl_rv(input$tbl_functions)
+    # Update metric choices for new DB
+    proj <- sqm_data(); req(proj)
+    db <- toupper(sub("^fun_", "", input$tbl_functions))
+    metrics <- avail_fun_metrics(proj, db)
+    cur <- isolate(input$tbl_fun_metric)
+    sel <- if (!is.null(cur) && cur %in% metrics) cur else
+           if ("abund" %in% metrics) "abund" else metrics[[1]]
+    updateSelectInput(session, "tbl_fun_metric", choices = metrics, selected = sel)
+  })
   observeEvent(input$tbl_bins_btn,  ignoreNULL=TRUE, ignoreInit=TRUE,
     { active_tbl_rv("bins") })
 
@@ -539,6 +590,8 @@ server <- function(input, output, session) {
       is_sqm <- grepl("SqueezeMeta", creator_name() %||% "", ignore.case = TRUE)
       proj <- if (is_sqm) loadSQM(tp) else loadSQMlite(tp)
       sqm_data(proj); is_sqm_full(is_sqm); status("ready")
+
+
     }, error = function(e) { status("error"); showNotification(paste("Error:", e$message), type = "error", duration = 8) })
   })
   output$project_status_ui <- renderUI({
@@ -989,6 +1042,28 @@ server <- function(input, output, session) {
       checkboxGroupInput("selected_samples", NULL, choices = samples, selected = samples)
     )
   })
+  # ── Helper: enrich function table with Name / Path columns ──
+  # File format: header row is "\tName\tPath" (first col empty = row ID)
+  #              data rows:    "K00001\talcohol dehydrogenase...\tMetabolism;..."
+  enrich_fun_table <- function(proj, db, d) {
+    ids <- rownames(d)
+
+    # SQMtools stores names in proj$misc$<DB>_names and paths in proj$misc$<DB>_paths
+    names_vec <- tryCatch(proj$misc[[paste0(db, "_names")]], error = function(e) NULL)
+    paths_vec <- tryCatch(proj$misc[[paste0(db, "_paths")]], error = function(e) NULL)
+
+    if (!is.null(names_vec) && length(names_vec) > 0) {
+      name_col <- names_vec[ids]; name_col[is.na(name_col)] <- ""
+      if (!is.null(paths_vec) && length(paths_vec) > 0) {
+        path_col <- paths_vec[ids]; path_col[is.na(path_col)] <- ""
+        return(cbind(Name = name_col, Path = path_col, d))
+      }
+      return(cbind(Name = name_col, d))
+    }
+    d
+  }
+
+
   get_table_data <- reactive({
     req(sqm_data())
     proj <- sqm_data()
@@ -1000,14 +1075,17 @@ server <- function(input, output, session) {
       else if (tt == "orfs")    as.data.frame(proj$orfs$table)
       else if (tt == "bins")    as.data.frame(proj$bins$table)
       else if (startsWith(tt, "tax_")) {
-        rank <- sub("^tax_", "", tt)
-        d <- as.data.frame(proj$taxa[[rank]]$abund)
+        rank   <- sub("^tax_", "", tt)
+        metric <- input$tbl_tax_metric %||% "abund"
+        d <- as.data.frame(proj$taxa[[rank]][[metric]])
         if (!is.null(smp) && length(smp) > 0) d[, colnames(d) %in% smp, drop = FALSE] else d
       }
       else if (startsWith(tt, "fun_")) {
-        db <- toupper(sub("^fun_", "", tt))
-        d  <- as.data.frame(proj$functions[[db]]$abund)
-        if (!is.null(smp) && length(smp) > 0) d[, colnames(d) %in% smp, drop = FALSE] else d
+        db     <- toupper(sub("^fun_", "", tt))
+        metric <- input$tbl_fun_metric %||% "abund"
+        d  <- as.data.frame(proj$functions[[db]][[metric]])
+        if (!is.null(smp) && length(smp) > 0) d <- d[, colnames(d) %in% smp, drop = FALSE]
+        enrich_fun_table(proj, db, d)
       }
     }, error = function(e) NULL)
   })
@@ -1022,8 +1100,24 @@ server <- function(input, output, session) {
                  else                               ""
     # Set row names as a proper column with the right header
     df <- cbind(setNames(data.frame(rownames(df), stringsAsFactors=FALSE), row_label), df)
+    num_cols <- which(sapply(df, is.numeric)) - 1L  # 0-based for DT
+    # Use rowCallback to format all numeric cells after render
+    fmt_callback <- JS(paste0(
+      "function(row, data, index) {",
+      "  var ncols = ", length(which(sapply(df, is.numeric))), ";",
+      "  var start = ", ncol(df) - length(which(sapply(df, is.numeric))), ";",
+      "  for (var i = start; i < data.length; i++) {",
+      "    var n = parseFloat(data[i]);",
+      "    if (!isNaN(n)) {",
+      "      var fmt = Math.abs(n) >= 10000 ? n.toExponential(3) : parseFloat(n.toFixed(3)).toString();",
+      "      $('td:eq(' + i + ')', row).html(fmt);",
+      "    }",
+      "  }",
+      "}"
+    ))
     datatable(df, rownames=FALSE,
-      options=list(pageLength=20, scrollX=TRUE, dom="lfrtip"),
+      options=list(pageLength=20, scrollX=TRUE, dom="lfrtip",
+                   rowCallback = fmt_callback),
       class="compact hover stripe")
   })
   output$download_table <- downloadHandler(
