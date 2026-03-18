@@ -76,13 +76,7 @@ BiocManager::install("pathview")
 
 The Pathways tab requires an **internet connection** at generation time — `pathview` downloads the pathway map image from the KEGG servers on each run (XML/PNG files are cached locally in the output directory for that session).
 
-**Optional — richer combined legend:**
-
-```r
-install.packages(c("ggpattern", "magick"))
-```
-
-If both `ggpattern` and `magick` are installed, `exportPathway` can return a ggplot object with the pathway map and legend combined. SQMxplore generates its own inline legend regardless, so these packages are not required.
+`ggpattern` and `magick` are **not required**. SQMxplore generates its own inline color scale legend. Do not attempt to install `ggpattern` — it depends on `sf` → `s2` / `units`, which require system GIS libraries (GDAL, PROJ) that are rarely available in conda environments.
 
 ### KronaTools (optional, required for Krona tab)
 
@@ -227,8 +221,6 @@ Overlays KEGG functional abundance data onto pathway maps using `exportPathway` 
 | pandoc | conda-forge / system | Yes (needed by DT in conda envs) |
 | pathview | Bioconductor | Pathways tab only |
 | KEGGREST | Bioconductor (auto-installed with pathview) | Pathways tab only |
-| ggpattern | CRAN | Optional (richer legend) |
-| magick | CRAN | Optional (richer legend) |
 | KronaTools (`ktImportText`) | conda / GitHub | Krona tab only |
 
 ---
