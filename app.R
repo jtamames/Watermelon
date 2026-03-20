@@ -2651,6 +2651,7 @@ server <- function(input, output, session) {
   pw_img_dir   <- reactiveVal(NULL)     # tempdir where PNGs were written
   pw_img_files <- reactiveVal(NULL)    # character vector of PNG paths
   pw_legend    <- reactiveVal(NULL)    # list: colors, min, max, log_sc, cnt, fc
+  pw_nodes     <- reactiveVal(NULL)    # data.frame: ko_ids, x, y, w, h, label, name
   pw_pathway_choices <- reactiveVal(NULL)  # named vector: "Name [id]" = "id"
 
   # ── Pathway tree is static; just signal ready on project load ──
@@ -2868,9 +2869,55 @@ server <- function(input, output, session) {
         output_suffix      = paste0("sqmxplore_", pid)
       )
 
-      # Collect PNGs written by pathview (exclude legends)
+      # ── Parse KGML to extract node positions for image map ──
+      # pathview downloads ko<pid>.xml — re-download it since pathview deletes it
+      xml_nodes <- tryCatch({
+        if (!requireNamespace("xml2", quietly=TRUE)) stop("xml2 not available")
+        xml_path <- file.path(outdir, paste0("ko", pid, ".xml"))
+        if (!file.exists(xml_path)) {
+          pathview::download.kegg(pathway.id=pid, species="ko", kegg.dir=outdir)
+        }
+        if (!file.exists(xml_path)) stop("XML not downloaded")
+        doc <- xml2::read_xml(xml_path)
+        entries <- xml2::xml_find_all(doc, ".//entry[@type='ortholog']")
+        rows <- lapply(entries, function(e) {
+          ko_names <- trimws(xml2::xml_attr(e, "name"))  # "ko:K00001 ko:K00002"
+          g <- xml2::xml_find_first(e, "graphics")
+          if (is.na(xml2::xml_attr(g, "x"))) return(NULL)
+          x <- as.numeric(xml2::xml_attr(g, "x"))
+          y <- as.numeric(xml2::xml_attr(g, "y"))
+          w <- as.numeric(xml2::xml_attr(g, "width"))
+          h <- as.numeric(xml2::xml_attr(g, "height"))
+          if (anyNA(c(x,y,w,h))) return(NULL)
+          label <- xml2::xml_attr(g, "name")  # short label shown in box
+          list(ko_names=ko_names, x=x, y=y, w=w, h=h, label=label)
+        })
+        rows <- Filter(Negate(is.null), rows)
+        if (length(rows) == 0) stop("no ortholog entries")
+        data.frame(
+          ko_names = sapply(rows, `[[`, "ko_names"),
+          x        = sapply(rows, `[[`, "x"),
+          y        = sapply(rows, `[[`, "y"),
+          w        = sapply(rows, `[[`, "w"),
+          h        = sapply(rows, `[[`, "h"),
+          label    = sapply(rows, `[[`, "label"),
+          stringsAsFactors = FALSE
+        )
+      }, error = function(e) { message("XML parse error: ", e$message); NULL })
+      pw_nodes(xml_nodes)
+
+      # Collect PNGs written by pathview (exclude legends and base map)
       pngs_all <- list.files(outdir, pattern = "[.]png$", full.names = TRUE)
       pngs_all <- pngs_all[!grepl("[.]legend[.]", basename(pngs_all))]
+      # pathview writes the original base PNG (ko<pid>.png) alongside the output —
+      # exclude it: keep only files that contain the output_suffix in the name
+      suffix_pat <- paste0("sqmxplore_", pid)
+      pngs_all <- pngs_all[grepl(suffix_pat, basename(pngs_all), fixed=TRUE)]
+      # In "together" mode with >1 sample, prefer the .multi.png over per-sample PNGs
+      if (mode != "split" && length(pngs_all) > 1) {
+        multi <- pngs_all[grepl("[.]multi[.]png$", basename(pngs_all))]
+        if (length(multi) > 0) pngs_all <- multi
+      }
 
       if (length(pngs_all) == 0) {
         pw_status("error")
@@ -2949,16 +2996,79 @@ server <- function(input, output, session) {
     # Serve the output dir as a static resource
     res_name <- paste0("pw_", basename(out_dir))
     addResourcePath(res_name, out_dir)
-    img_tags <- lapply(imgs, function(f) {
-      fname <- basename(f)
-      tags$div(style = "margin-bottom:12px;",
-        tags$img(
-          src   = paste0(res_name, "/", fname),
-          style = "max-width:100%; border:1px solid var(--border); border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,.08);",
-          alt   = fname
-        )
+    nodes <- pw_nodes()
+    kegg_names <- tryCatch(sqm_data()$misc$KEGG_names, error=function(e) NULL)
+
+    # CSS tooltip that follows the cursor — fast, styleable, no delay
+    tooltip_css <- tags$style(HTML("
+      #pw-tooltip {
+        position: fixed; pointer-events: none; z-index: 9999;
+        background: rgba(20,30,50,0.92); color: #f0f4f8;
+        padding: 5px 9px; border-radius: 5px; font-size: 0.75rem;
+        max-width: 320px; line-height: 1.4; display: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        white-space: pre-wrap; word-break: break-word;
+      }
+    "))
+    tooltip_div <- tags$div(id="pw-tooltip")
+    tooltip_js  <- tags$script(HTML("
+      (function() {
+        var tip = document.getElementById('pw-tooltip');
+        if (!tip) return;
+        document.addEventListener('mousemove', function(e) {
+          tip.style.left = (e.clientX + 14) + 'px';
+          tip.style.top  = (e.clientY + 14) + 'px';
+        });
+      })();
+      function pwShowTip(el) {
+        var tip = document.getElementById('pw-tooltip');
+        if (tip) { tip.textContent = el.getAttribute('data-tip'); tip.style.display = 'block'; }
+      }
+      function pwHideTip() {
+        var tip = document.getElementById('pw-tooltip');
+        if (tip) tip.style.display = 'none';
+      }
+    "))
+
+    make_img_map <- function(fname, map_id) {
+      if (is.null(nodes) || nrow(nodes) == 0) {
+        return(tags$div(style="margin-bottom:12px;",
+          tags$img(src=paste0(res_name,"/",fname),
+            style="max-width:100%; border:1px solid var(--border); border-radius:6px;",
+            alt=fname)))
+      }
+      areas <- apply(nodes, 1, function(r) {
+        ko_ids <- trimws(unlist(strsplit(r["ko_names"], "\\s+")))
+        ko_ids <- sub("^ko:", "", ko_ids)
+        if (!is.null(kegg_names)) {
+          nms <- unique(na.omit(kegg_names[ko_ids]))
+        } else nms <- character(0)
+        ko_str   <- paste(ko_ids, collapse=", ")
+        name_str <- if (length(nms)>0) paste(nms, collapse=" / ") else r["label"]
+        tip <- if (nchar(trimws(name_str))>0) paste0(ko_str, "\n", name_str) else ko_str
+        x  <- as.numeric(r["x"]); y <- as.numeric(r["y"])
+        w  <- as.numeric(r["w"]); h <- as.numeric(r["h"])
+        x1 <- round(x-w/2); y1 <- round(y-h/2)
+        x2 <- round(x+w/2); y2 <- round(y+h/2)
+        tags$area(shape="rect", coords=paste(x1,y1,x2,y2,sep=","),
+          "data-tip"    = tip,
+          onmouseenter  = "pwShowTip(this)",
+          onmouseleave  = "pwHideTip()",
+          href          = "javascript:void(0)",
+          alt           = ko_str)
+      })
+      tags$div(style="margin-bottom:12px; position:relative;",
+        tags$img(src=paste0(res_name,"/",fname), useMap=paste0("#",map_id),
+          style="max-width:100%; border:1px solid var(--border); border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,.08);",
+          alt=fname),
+        tags$map(name=map_id, areas)
       )
+    }
+    img_tags <- lapply(seq_along(imgs), function(i) {
+      make_img_map(basename(imgs[[i]]), paste0("pwmap_", i))
     })
+    # Prepend tooltip infrastructure once
+    img_tags <- c(list(tooltip_css, tooltip_div, tooltip_js), img_tags)
 
     # ── Inline legend ──
     cnt_labels <- c(abund="Raw abundance", percent="Percentage", bases="Bases",
