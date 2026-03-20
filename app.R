@@ -2691,7 +2691,7 @@ server <- function(input, output, session) {
             "data-name" = tolower(paste(pw$name, pw$id)),
             style = "padding:2px 4px 2px 8px; cursor:pointer; font-size:0.75rem; border-radius:3px;",
             onclick = sprintf(
-              "Shiny.setInputValue('pw_pathway_id','%s',{priority:'event'}); document.querySelectorAll('.pw-item').forEach(function(el){el.style.background=''}); this.style.background='var(--accent-light)'; document.getElementById('pw_selected_label').textContent='%s [%s]';",
+              "event.stopPropagation(); Shiny.setInputValue('pw_pathway_id','%s',{priority:'event'}); document.querySelectorAll('.pw-item').forEach(function(el){el.style.background=''}); this.style.background='var(--accent-light)'; document.getElementById('pw_selected_label').textContent='%s [%s]';",
               pw$id, gsub("'", "\\\\'", pw$name), pw$id),
             tags$span(style="color:var(--muted); margin-right:4px; font-family:monospace;", pw$id),
             pw$name
@@ -2870,7 +2870,7 @@ server <- function(input, output, session) {
       )
 
       # ── Parse KGML to extract node positions for image map ──
-      # pathview downloads ko<pid>.xml — re-download it since pathview deletes it
+      # Use pathview's own node.info parser on the downloaded XML — same coords pathview uses
       xml_nodes <- tryCatch({
         if (!requireNamespace("xml2", quietly=TRUE)) stop("xml2 not available")
         xml_path <- file.path(outdir, paste0("ko", pid, ".xml"))
@@ -2878,23 +2878,52 @@ server <- function(input, output, session) {
           pathview::download.kegg(pathway.id=pid, species="ko", kegg.dir=outdir)
         }
         if (!file.exists(xml_path)) stop("XML not downloaded")
+
+        # Also download the original KEGG PNG to measure its dimensions
+        png_orig <- file.path(outdir, paste0("ko", pid, ".png"))
+        if (!file.exists(png_orig)) {
+          pathview::download.kegg(pathway.id=pid, species="ko", kegg.dir=outdir,
+                                  file.type="png")
+        }
+        # Get scale factor: output PNG vs original KEGG PNG
+        scale_x <- 1; scale_y <- 1
+        if (file.exists(png_orig) && requireNamespace("png", quietly=TRUE)) {
+          orig_dim <- dim(png::readPNG(png_orig))  # [height, width, channels]
+          orig_w <- orig_dim[2]; orig_h <- orig_dim[1]
+          # Find the output PNG (multi or single)
+          out_pngs <- list.files(outdir, pattern=paste0("sqmxplore_",pid,".*[.]png$"),
+                                 full.names=TRUE)
+          out_pngs <- out_pngs[!grepl("[.]legend[.]", basename(out_pngs))]
+          if (length(out_pngs) > 0) {
+            out_dim <- dim(png::readPNG(out_pngs[1]))
+            out_w <- out_dim[2]; out_h <- out_dim[1]
+            scale_x <- out_w / orig_w
+            scale_y <- out_h / orig_h
+
+          }
+        }
+
         doc <- xml2::read_xml(xml_path)
         entries <- xml2::xml_find_all(doc, ".//entry[@type='ortholog']")
+        proj_kos <- tryCatch(
+          paste0("ko:", rownames(proj$functions$KEGG$abund)),
+          error=function(e) character(0))
         rows <- lapply(entries, function(e) {
-          ko_names <- trimws(xml2::xml_attr(e, "name"))  # "ko:K00001 ko:K00002"
+          ko_names <- trimws(xml2::xml_attr(e, "name"))
+
           g <- xml2::xml_find_first(e, "graphics")
           if (is.na(xml2::xml_attr(g, "x"))) return(NULL)
-          x <- as.numeric(xml2::xml_attr(g, "x"))
-          y <- as.numeric(xml2::xml_attr(g, "y"))
-          w <- as.numeric(xml2::xml_attr(g, "width"))
-          h <- as.numeric(xml2::xml_attr(g, "height"))
+          x <- as.numeric(xml2::xml_attr(g, "x")) * scale_x
+          y <- as.numeric(xml2::xml_attr(g, "y")) * scale_y
+          w <- as.numeric(xml2::xml_attr(g, "width"))  * scale_x
+          h <- as.numeric(xml2::xml_attr(g, "height")) * scale_y
           if (anyNA(c(x,y,w,h))) return(NULL)
-          label <- xml2::xml_attr(g, "name")  # short label shown in box
+          label <- xml2::xml_attr(g, "name")
           list(ko_names=ko_names, x=x, y=y, w=w, h=h, label=label)
         })
         rows <- Filter(Negate(is.null), rows)
-        if (length(rows) == 0) stop("no ortholog entries")
-        data.frame(
+        if (length(rows) == 0) return(NULL)
+        df <- data.frame(
           ko_names = sapply(rows, `[[`, "ko_names"),
           x        = sapply(rows, `[[`, "x"),
           y        = sapply(rows, `[[`, "y"),
@@ -2903,6 +2932,10 @@ server <- function(input, output, session) {
           label    = sapply(rows, `[[`, "label"),
           stringsAsFactors = FALSE
         )
+        # Deduplicate: same position = same box painted by pathview
+        pos_key <- paste(round(df$x), round(df$y), sep=",")
+        df <- df[!duplicated(pos_key), ]
+        df
       }, error = function(e) { message("XML parse error: ", e$message); NULL })
       pw_nodes(xml_nodes)
 
@@ -2948,7 +2981,27 @@ server <- function(input, output, session) {
           leg_min <- -mv; leg_max <- mv; leg_log <- FALSE
         } else if (!is.null(mat)) {
           if (log_sc) mat <- log(mat + 0.001, 10)
-          leg_min <- min(mat, na.rm=TRUE); leg_max <- max(mat, na.rm=TRUE); leg_log <- log_sc
+          # Replicate pathview's node.map aggregation: sum KOs per node
+          # so the scale matches what is actually painted on the map
+          node_sums <- tryCatch({
+            xml_path2 <- file.path(outdir, paste0("ko", pid, ".xml"))
+            if (file.exists(xml_path2) && requireNamespace("xml2", quietly=TRUE)) {
+              doc2    <- xml2::read_xml(xml_path2)
+              entries2 <- xml2::xml_find_all(doc2, ".//entry[@type='ortholog']")
+              sums <- lapply(entries2, function(e) {
+                kos <- unique(sub("^ko:", "", trimws(unlist(strsplit(
+                  trimws(xml2::xml_attr(e, "name")), "[[:space:]]+")))))
+                kos_in <- kos[kos %in% rownames(mat)]
+                if (length(kos_in) == 0) return(NULL)
+                colSums(mat[kos_in, , drop=FALSE], na.rm=TRUE)
+              })
+              sums <- do.call(rbind, Filter(Negate(is.null), sums))
+              if (!is.null(sums) && nrow(sums) > 0) sums else mat
+            } else mat
+          }, error=function(e) mat)
+          leg_min <- min(node_sums, na.rm=TRUE)
+          leg_max <- max(node_sums, na.rm=TRUE)
+          leg_log <- log_sc
         } else {
           leg_min <- 0; leg_max <- 1; leg_log <- log_sc
         }
@@ -3030,38 +3083,108 @@ server <- function(input, output, session) {
       }
     "))
 
-    make_img_map <- function(fname, map_id) {
-      if (is.null(nodes) || nrow(nodes) == 0) {
-        return(tags$div(style="margin-bottom:12px;",
-          tags$img(src=paste0(res_name,"/",fname),
-            style="max-width:100%; border:1px solid var(--border); border-radius:6px;",
-            alt=fname)))
+    # Build data matrix for value lookup (same logic as exportPathway)
+    pw_mat <- tryCatch({
+      proj <- sqm_data(); req(proj)
+      cnt_local <- leg$cnt %||% "copy_number"
+      m <- if (cnt_local == "percent") {
+        100 * t(t(proj$functions$KEGG$abund) / proj$total_reads)
+      } else {
+        proj$functions$KEGG[[cnt_local]]
       }
-      areas <- apply(nodes, 1, function(r) {
-        ko_ids <- trimws(unlist(strsplit(r["ko_names"], "\\s+")))
-        ko_ids <- sub("^ko:", "", ko_ids)
+      if (!is.null(leg$log_sc) && leg$log_sc) log(m + 0.001, 10) else m
+    }, error=function(e) NULL)
+
+    # Serialize node tooltip data to JSON for JS overlay
+    build_node_json <- function() {
+      if (is.null(nodes) || nrow(nodes) == 0) return("[]")
+      rows_json <- apply(nodes, 1, function(r) {
+        ko_ids <- trimws(unlist(strsplit(r["ko_names"], "[[:space:]]+")))
+        ko_ids <- unique(sub("^ko:", "", ko_ids))
         if (!is.null(kegg_names)) {
           nms <- unique(na.omit(kegg_names[ko_ids]))
         } else nms <- character(0)
         ko_str   <- paste(ko_ids, collapse=", ")
         name_str <- if (length(nms)>0) paste(nms, collapse=" / ") else r["label"]
         tip <- if (nchar(trimws(name_str))>0) paste0(ko_str, "\n", name_str) else ko_str
-        x  <- as.numeric(r["x"]); y <- as.numeric(r["y"])
-        w  <- as.numeric(r["w"]); h <- as.numeric(r["h"])
-        x1 <- round(x-w/2); y1 <- round(y-h/2)
-        x2 <- round(x+w/2); y2 <- round(y+h/2)
-        tags$area(shape="rect", coords=paste(x1,y1,x2,y2,sep=","),
-          "data-tip"    = tip,
-          onmouseenter  = "pwShowTip(this)",
-          onmouseleave  = "pwHideTip()",
-          href          = "javascript:void(0)",
-          alt           = ko_str)
+        if (!is.null(pw_mat)) {
+          val_rows <- pw_mat[rownames(pw_mat) %in% ko_ids, , drop=FALSE]
+          if (nrow(val_rows) > 0) {
+            col_sums <- colSums(val_rows, na.rm=TRUE)
+            val_str  <- paste(sapply(names(col_sums), function(s) {
+              v <- col_sums[[s]]
+              fv <- if (abs(v) >= 10000) formatC(v, digits=3, format="e")
+                    else formatC(v, digits=3, format="g")
+              paste0(s, ": ", fv)
+            }), collapse="\n")
+            tip <- paste0(tip, "\n\u2014\n", val_str)
+          } else {
+            tip <- paste0(tip, "\n\u2014\n(not in data)")
+          }
+        }
+        x <- as.numeric(r["x"]); y <- as.numeric(r["y"])
+        w <- as.numeric(r["w"]); h <- as.numeric(r["h"])
+        tip_esc <- gsub('"', '\\\\"', gsub("\n", "\\\\n", tip))
+        sprintf('{"x":%g,"y":%g,"w":%g,"h":%g,"tip":"%s"}', x, y, w, h, tip_esc)
       })
-      tags$div(style="margin-bottom:12px; position:relative;",
-        tags$img(src=paste0(res_name,"/",fname), useMap=paste0("#",map_id),
-          style="max-width:100%; border:1px solid var(--border); border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,.08);",
-          alt=fname),
-        tags$map(name=map_id, areas)
+      paste0("[", paste(rows_json, collapse=","), "]")
+    }
+
+    make_img_map <- function(fname, map_id) {
+      img_src <- paste0(res_name, "/", fname)
+      if (is.null(nodes) || nrow(nodes) == 0) {
+        return(tags$div(style="margin-bottom:12px;",
+          tags$img(src=img_src, id=map_id,
+            style="max-width:100%; border:1px solid var(--border); border-radius:6px;",
+            alt=fname)))
+      }
+      node_json <- build_node_json()
+      # Canvas overlay: positioned absolutely over the img, scaled via JS
+      tagList(
+        tags$div(style="margin-bottom:12px; position:relative; display:inline-block; width:100%;",
+          tags$img(src=img_src, id=map_id,
+            style="max-width:100%; display:block; border:1px solid var(--border); border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,.08);",
+            alt=fname),
+          tags$canvas(id=paste0(map_id,"_canvas"),
+            style="position:absolute; top:0; left:0; width:100%; height:100%; cursor:crosshair;")
+        ),
+        tags$script(HTML(sprintf('
+          (function() {
+            var nodes = %s;
+            var img   = document.getElementById("%s");
+            var canvas= document.getElementById("%s_canvas");
+            function setup() {
+              canvas.width  = img.offsetWidth;
+              canvas.height = img.offsetHeight;
+              var scaleX = img.offsetWidth  / img.naturalWidth;
+              var scaleY = img.offsetHeight / img.naturalHeight;
+              canvas.addEventListener("mousemove", function(e) {
+                var rect = canvas.getBoundingClientRect();
+                var mx = (e.clientX - rect.left);
+                var my = (e.clientY - rect.top);
+                var hit = null;
+                for (var i=0; i<nodes.length; i++) {
+                  var n = nodes[i];
+                  var x1 = (n.x - n.w/2) * scaleX;
+                  var y1 = (n.y - n.h/2) * scaleY;
+                  var x2 = (n.x + n.w/2) * scaleX;
+                  var y2 = (n.y + n.h/2) * scaleY;
+                  if (mx>=x1 && mx<=x2 && my>=y1 && my<=y2) { hit=n; break; }
+                }
+                if (hit) {
+                  var tip = document.getElementById("pw-tooltip");
+                  if (tip) { tip.textContent = hit.tip.replace(/\\\\n/g,"\\n"); tip.style.display="block"; }
+                } else { pwHideTip(); }
+              });
+              canvas.addEventListener("mouseleave", pwHideTip);
+            }
+            if (img.complete) { setup(); }
+            else { img.addEventListener("load", setup); }
+            window.addEventListener("resize", function() {
+              if (img.complete) setup();
+            });
+          })();
+        ', node_json, map_id, map_id)))
       )
     }
     img_tags <- lapply(seq_along(imgs), function(i) {
