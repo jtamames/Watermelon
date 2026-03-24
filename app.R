@@ -1762,11 +1762,7 @@ ui <- page_navbar(
           tags$div(class = "form-label", "KEGG Pathway"),
           uiOutput("pw_pathway_select_ui"),
           tags$div(class = "form-label", style = "margin-top:4px;", "Count type"),
-          selectInput("pw_count", NULL,
-            choices = c("Copy number" = "copy_number", "TPM" = "tpm",
-                        "Raw abundances" = "abund", "Percentages" = "percent",
-                        "Base counts" = "bases"),
-            selected = "copy_number")
+          uiOutput("pw_count_ui")
         ),
         tags$div(class = "sidebar-box",
           tags$div(class = "form-label", "Mode"),
@@ -1777,11 +1773,9 @@ ui <- page_navbar(
             selected = "together"),
           uiOutput("pw_foldchange_ui")
         ),
-        tags$div(class = "sidebar-box",
-          checkboxInput("pw_log_scale", "Log scale", value = FALSE)
-        ),
         tags$hr(class = "section-divider"),
-        actionButton("do_pathway", "Generate map", class = "btn-primary w-100 mt-1"),
+        uiOutput("pw_sample_selector_ui"),
+
         tags$div(style = "margin-top:5px;", uiOutput("pw_download_ui")),
         tags$div(style = "margin-top:10px;", uiOutput("pw_status_ui"))
       ),
@@ -2649,6 +2643,7 @@ server <- function(input, output, session) {
   # ═══════════════════════════════════════════════════════
   pw_status   <- reactiveVal("idle")   # idle | generating | ready | error
   pw_img_dir   <- reactiveVal(NULL)     # tempdir where PNGs were written
+  pw_kegg_cache <- file.path(tempdir(), "sqmxplore_kegg_cache")  # shared XML/PNG cache
   pw_img_files <- reactiveVal(NULL)    # character vector of PNG paths
   pw_legend    <- reactiveVal(NULL)    # list: colors, min, max, log_sc, cnt, fc
   pw_nodes     <- reactiveVal(NULL)    # data.frame: ko_ids, x, y, w, h, label, name
@@ -2731,9 +2726,18 @@ server <- function(input, output, session) {
       style = paste0(
         "font-size:0.75rem; color:var(--muted); font-style:italic;",
         "margin-bottom:4px; min-height:1.2em;"),
-      if (!is.null(input$pw_pathway_id) && nchar(input$pw_pathway_id) > 0)
-        paste0("Selected: ", input$pw_pathway_id)
-      else
+      if (!is.null(input$pw_pathway_id) && nchar(input$pw_pathway_id) > 0) {
+        # Find name for current selection
+        pid_cur <- input$pw_pathway_id
+        pw_name <- tryCatch({
+          found <- ""
+          for (l1 in KEGG_HIERARCHY) for (l2 in l1) for (pw in l2)
+            if (identical(pw$id, pid_cur)) { found <- pw$name; break }
+          found
+        }, error=function(e) "")
+        if (nchar(pw_name) > 0) paste0(pw_name, " [", pid_cur, "]")
+        else paste0("Selected: ", pid_cur)
+      } else
         "None selected"
     )
 
@@ -2776,6 +2780,60 @@ server <- function(input, output, session) {
     )
   })
 
+  output$pw_sample_selector_ui <- renderUI({
+    req(sqm_data())
+    samples <- tryCatch(sqm_data()$misc$samples, error=function(e) NULL)
+    req(samples)
+    tags$div(class = "sidebar-box",
+      tags$div(class = "form-label", "Samples"),
+      tags$div(style = "display:flex; flex-wrap:wrap; gap:2px; margin-top:2px;",
+        lapply(samples, function(s) {
+          is_sel <- is.null(input$pw_samples) || s %in% input$pw_samples
+          tags$label(
+            style = paste0(
+              "display:inline-flex; align-items:center; gap:3px;",
+              "font-size:0.72rem; padding:2px 5px; border-radius:3px; cursor:pointer;",
+              "border:1px solid ", if (is_sel) "#3b9ede" else "var(--border)", ";",
+              "background:", if (is_sel) "rgba(59,158,222,0.08)" else "transparent", ";"),
+            tags$input(
+              type="checkbox", name="pw_samples", value=s,
+              checked = if (is_sel) NA else NULL,
+              style="margin:0; width:11px; height:11px;",
+              onclick = paste0(
+                "var cb=this; var vals=[];",
+                "document.querySelectorAll('input[name=pw_samples]').forEach(function(el){",
+                "if(el.checked) vals.push(el.value);});",
+                "Shiny.setInputValue('pw_samples', vals, {priority:'event'});",
+                "var lbl=cb.closest('label');",
+                "lbl.style.borderColor=cb.checked?'#3b9ede':'var(--border)';",
+                "lbl.style.background=cb.checked?'rgba(59,158,222,0.08)':'transparent';")),
+            s)
+        })
+      )
+    )
+  })
+
+  output$pw_count_ui <- renderUI({
+    all_counts <- c("Copy number" = "copy_number", "TPM" = "tpm",
+                    "Raw abundances" = "abund", "Percentages" = "percent",
+                    "Base counts" = "bases")
+    proj <- sqm_data()
+    if (is.null(proj)) {
+      # No project loaded yet — show all, exportPathway will validate
+      avail <- all_counts
+    } else {
+      avail <- Filter(function(m) {
+        if (m == "percent") return(TRUE)  # always computable
+        tryCatch(!is.null(proj$functions$KEGG[[m]]) &&
+                 nrow(proj$functions$KEGG[[m]]) > 0,
+                 error = function(e) FALSE)
+      }, all_counts)
+      if (length(avail) == 0) avail <- c("Percentages" = "percent")
+    }
+    sel <- if ("copy_number" %in% avail) "copy_number" else avail[[1]]
+    selectInput("pw_count", NULL, choices = avail, selected = sel)
+  })
+
   pathview_available <- reactive({
     requireNamespace("pathview", quietly = TRUE)
   })
@@ -2815,8 +2873,13 @@ server <- function(input, output, session) {
     )
   })
 
-  observeEvent(input$do_pathway, {
+  observe({
+    # Auto-trigger on any pathway control change
+    input$pw_pathway_id; input$pw_count; input$pw_mode
+    input$pw_samples; input$pw_fc_groupA; input$pw_fc_groupB
+    isolate({
     req(sqm_data())
+    req(nchar(input$pw_pathway_id %||% "") == 5)
     if (!pathview_available()) {
       showNotification(
         'pathview not installed. Run: BiocManager::install("pathview")',
@@ -2830,23 +2893,41 @@ server <- function(input, output, session) {
     }
     pw_status("generating"); pw_img_files(NULL)
 
-    tryCatch({
+    shinyjs::delay(50, tryCatch({
       proj   <- sqm_data()
-      outdir <- file.path(tempdir(), paste0("sqmxplore_pw_", format(Sys.time(), "%Y%m%d%H%M%S")))
-      dir.create(outdir, showWarnings = FALSE)
-
       mode    <- input$pw_mode
-      log_sc  <- isTRUE(input$pw_log_scale)
+      log_sc  <- FALSE
       cnt     <- input$pw_count %||% "copy_number"
       fc_grps <- NULL
       if (mode == "foldchange") {
         grpA <- input$pw_fc_groupA; grpB <- input$pw_fc_groupB
-        if (length(grpA) == 0 || length(grpB) == 0) {
-          showNotification("Select at least one sample for each fold-change group.",
-                           type = "warning", duration = 6)
-          pw_status("idle"); return()
-        }
-        fc_grps <- list(grpA, grpB)
+        if (length(grpA) > 0 && length(grpB) > 0)
+          fc_grps <- list(grpA, grpB)
+      }
+      # Normalise sample selection: NULL / empty / all-selected → same key
+      all_smp_names <- tryCatch(sort(sqm_data()$misc$samples), error=function(e) character(0))
+      sel_smp_raw   <- input$pw_samples
+      sel_smp_norm  <- if (is.null(sel_smp_raw) || length(sel_smp_raw) == 0 ||
+                           setequal(sel_smp_raw, all_smp_names))
+                         all_smp_names
+                       else sort(sel_smp_raw)
+      # Shared KEGG cache dir (XML + orig PNG) — reused across runs
+      dir.create(pw_kegg_cache, showWarnings = FALSE, recursive = TRUE)
+      # Per-run output dir — unique per pathway+count+mode+log+samples+fc
+      fc_key  <- if (!is.null(fc_grps))
+                   paste0("fc_", paste(sort(fc_grps[[1]]),collapse=""),
+                          "_vs_", paste(sort(fc_grps[[2]]),collapse=""))
+                 else ""
+      smp_key <- substr(gsub("[^a-zA-Z0-9]","", paste(sel_smp_norm, collapse="-")), 1, 30)
+      run_key <- paste0(pid, "_", cnt, "_", mode,
+                        if (log_sc) "_log" else "", "_", smp_key, fc_key)
+      outdir  <- file.path(tempdir(), paste0("sqmxplore_pw_", run_key))
+      dir.create(outdir, showWarnings = FALSE, recursive = TRUE)
+      # Validate foldchange groups
+      if (mode == "foldchange" && is.null(fc_grps)) {
+        showNotification("Select at least one sample for each fold-change group.",
+                         type = "warning", duration = 6)
+        pw_status("idle"); return()
       }
 
       # Pre-compute sample colors so map and legend are consistent
@@ -2857,32 +2938,76 @@ server <- function(input, output, session) {
       auto_cols <- if (n_smp_ep == 1) "#E41A1C" else
         hcl(h = seq(15, 375, length.out = n_smp_ep + 1)[seq_len(n_smp_ep)], c = 100, l = 55)
 
-      exportPathway(
-        proj,
-        pathway_id         = pid,
-        count              = cnt,
-        split_samples      = (mode == "split"),
-        log_scale          = log_sc,
-        fold_change_groups = fc_grps,
-        sample_colors      = if (mode != "foldchange") auto_cols else NULL,
-        output_dir         = outdir,
-        output_suffix      = paste0("sqmxplore_", pid)
-      )
+      # If output PNGs already exist for this exact config, skip re-rendering
+      existing_pngs <- list.files(outdir, pattern=paste0("sqmxplore_",pid,".*[.]png$"),
+                                  full.names=TRUE)
+      existing_pngs <- existing_pngs[!grepl("[.]legend[.]", basename(existing_pngs))]
+      skip_render <- length(existing_pngs) > 0
+      message("DEBUG cache: run_key=", run_key,
+              " skip=", skip_render,
+              " smp_norm=", paste(sel_smp_norm, collapse=","))
+
+      # Subset samples if selection is active
+      if (!skip_render) {
+        if (!setequal(sel_smp_norm, all_smp_names) && length(sel_smp_norm) > 0) {
+          proj <- subsetSamples(proj, sel_smp_norm)
+          auto_cols <- auto_cols[seq_along(sel_smp_norm)]
+        }
+
+        # Override download.kegg to use cache when files already exist
+        xml_cached <- file.path(pw_kegg_cache, paste0("ko", pid, ".xml"))
+        png_cached <- file.path(pw_kegg_cache, paste0("ko", pid, ".png"))
+        have_cache <- file.exists(xml_cached) && file.exists(png_cached)
+        if (have_cache) {
+          # Monkey-patch download.kegg in pathview namespace to skip download
+          orig_dl <- get("download.kegg", envir=asNamespace("pathview"))
+          mock_dl <- function(pathway.id, species="ko", kegg.dir=".", file.type=c("xml","png")) {
+            # Copy from cache instead of downloading
+            for (ft in file.type) {
+              src <- file.path(pw_kegg_cache, paste0(species, pathway.id, ".", ft))
+              dst <- file.path(kegg.dir,      paste0(species, pathway.id, ".", ft))
+              if (file.exists(src) && !file.exists(dst)) file.copy(src, dst)
+            }
+            invisible(setNames("succeed", paste0(species, pathway.id)))
+          }
+          assignInNamespace("download.kegg", mock_dl, ns="pathview")
+          on.exit(assignInNamespace("download.kegg", orig_dl, ns="pathview"), add=TRUE)
+        }
+
+        exportPathway(
+          proj,
+          pathway_id         = pid,
+          count              = cnt,
+          split_samples      = (mode == "split"),
+          log_scale          = log_sc,
+          fold_change_groups = fc_grps,
+          sample_colors      = if (mode != "foldchange") auto_cols else NULL,
+          output_dir         = outdir,
+          output_suffix      = paste0("sqmxplore_", pid)
+        )
+      }
+
+      # Save downloaded files back to cache if not already there
+      for (ext in c(".xml", ".png")) {
+        from_outdir <- file.path(outdir,        paste0("ko", pid, ext))
+        to_cache    <- file.path(pw_kegg_cache, paste0("ko", pid, ext))
+        if (file.exists(from_outdir) && !file.exists(to_cache))
+          file.copy(from_outdir, to_cache)
+      }
 
       # ── Parse KGML to extract node positions for image map ──
-      # Use pathview's own node.info parser on the downloaded XML — same coords pathview uses
       xml_nodes <- tryCatch({
         if (!requireNamespace("xml2", quietly=TRUE)) stop("xml2 not available")
-        xml_path <- file.path(outdir, paste0("ko", pid, ".xml"))
+        xml_path <- file.path(pw_kegg_cache, paste0("ko", pid, ".xml"))
         if (!file.exists(xml_path)) {
-          pathview::download.kegg(pathway.id=pid, species="ko", kegg.dir=outdir)
+          pathview::download.kegg(pathway.id=pid, species="ko", kegg.dir=pw_kegg_cache)
         }
         if (!file.exists(xml_path)) stop("XML not downloaded")
 
         # Also download the original KEGG PNG to measure its dimensions
-        png_orig <- file.path(outdir, paste0("ko", pid, ".png"))
+        png_orig <- file.path(pw_kegg_cache, paste0("ko", pid, ".png"))
         if (!file.exists(png_orig)) {
-          pathview::download.kegg(pathway.id=pid, species="ko", kegg.dir=outdir,
+          pathview::download.kegg(pathway.id=pid, species="ko", kegg.dir=pw_kegg_cache,
                                   file.type="png")
         }
         # Get scale factor: output PNG vs original KEGG PNG
@@ -2904,13 +3029,11 @@ server <- function(input, output, session) {
         }
 
         doc <- xml2::read_xml(xml_path)
+
+        # ── Ortholog nodes (enzyme boxes) ──
         entries <- xml2::xml_find_all(doc, ".//entry[@type='ortholog']")
-        proj_kos <- tryCatch(
-          paste0("ko:", rownames(proj$functions$KEGG$abund)),
-          error=function(e) character(0))
         rows <- lapply(entries, function(e) {
           ko_names <- trimws(xml2::xml_attr(e, "name"))
-
           g <- xml2::xml_find_first(e, "graphics")
           if (is.na(xml2::xml_attr(g, "x"))) return(NULL)
           x <- as.numeric(xml2::xml_attr(g, "x")) * scale_x
@@ -2919,23 +3042,41 @@ server <- function(input, output, session) {
           h <- as.numeric(xml2::xml_attr(g, "height")) * scale_y
           if (anyNA(c(x,y,w,h))) return(NULL)
           label <- xml2::xml_attr(g, "name")
-          list(ko_names=ko_names, x=x, y=y, w=w, h=h, label=label)
+          list(ko_names=ko_names, x=x, y=y, w=w, h=h, label=label, link_pid="")
         })
-        rows <- Filter(Negate(is.null), rows)
-        if (length(rows) == 0) return(NULL)
+
+        # ── Map-link nodes (rounded rectangles linking to other pathways) ──
+        map_entries <- xml2::xml_find_all(doc, ".//entry[@type='map']")
+        map_rows <- lapply(map_entries, function(e) {
+          entry_name <- trimws(xml2::xml_attr(e, "name"))  # e.g. "path:ko00020"
+          link_pid   <- sub("^path:ko", "", entry_name)    # e.g. "00020"
+          if (!grepl("^[0-9]{5}$", link_pid)) return(NULL)
+          g <- xml2::xml_find_first(e, "graphics")
+          if (is.na(xml2::xml_attr(g, "x"))) return(NULL)
+          x <- as.numeric(xml2::xml_attr(g, "x")) * scale_x
+          y <- as.numeric(xml2::xml_attr(g, "y")) * scale_y
+          w <- as.numeric(xml2::xml_attr(g, "width"))  * scale_x
+          h <- as.numeric(xml2::xml_attr(g, "height")) * scale_y
+          if (anyNA(c(x,y,w,h))) return(NULL)
+          label <- xml2::xml_attr(g, "name")
+          list(ko_names="", x=x, y=y, w=w, h=h, label=label, link_pid=link_pid)
+        })
+
+        all_rows <- Filter(Negate(is.null), c(rows, map_rows))
+        if (length(all_rows) == 0) return(NULL)
         df <- data.frame(
-          ko_names = sapply(rows, `[[`, "ko_names"),
-          x        = sapply(rows, `[[`, "x"),
-          y        = sapply(rows, `[[`, "y"),
-          w        = sapply(rows, `[[`, "w"),
-          h        = sapply(rows, `[[`, "h"),
-          label    = sapply(rows, `[[`, "label"),
+          ko_names = sapply(all_rows, `[[`, "ko_names"),
+          x        = sapply(all_rows, `[[`, "x"),
+          y        = sapply(all_rows, `[[`, "y"),
+          w        = sapply(all_rows, `[[`, "w"),
+          h        = sapply(all_rows, `[[`, "h"),
+          label    = sapply(all_rows, `[[`, "label"),
+          link_pid = sapply(all_rows, `[[`, "link_pid"),
           stringsAsFactors = FALSE
         )
-        # Deduplicate: same position = same box painted by pathview
+        # Deduplicate by position
         pos_key <- paste(round(df$x), round(df$y), sep=",")
-        df <- df[!duplicated(pos_key), ]
-        df
+        df[!duplicated(pos_key), ]
       }, error = function(e) { message("XML parse error: ", e$message); NULL })
       pw_nodes(xml_nodes)
 
@@ -2959,18 +3100,24 @@ server <- function(input, output, session) {
                  ". Check that the pathway ID is valid and has KEGG KO annotations."),
           type = "error", duration = 10)
       } else {
-        # Compute legend info from the same parameters used in exportPathway
-        samples_used <- tryCatch(proj$misc$samples, error=function(e) character(0))
-        if (is.null(samples_used) || length(samples_used)==0) samples_used <- tryCatch(colnames(proj$functions$KEGG$abund), error=function(e) character(0))
+        # Compute legend info — use the actual selected samples
+        samples_used <- sel_smp_norm
+        if (length(samples_used) == 0)
+          samples_used <- tryCatch(proj$misc$samples, error=function(e) character(0))
         n_smp  <- length(samples_used)
-        s_cols <- auto_cols  # reuse colors computed for exportPathway call
+        s_cols <- auto_cols[seq_len(n_smp)]  # trim colors to selected samples
         # Compute min/max from KEGG data (same logic as exportPathway)
         mat <- tryCatch({
-          if (cnt == "percent") {
+          m <- if (cnt == "percent") {
             100 * t(t(proj$functions$KEGG$abund) / proj$total_reads)
           } else {
             proj$functions$KEGG[[cnt]]
           }
+          # Subset to selected samples
+          if (!is.null(m) && length(samples_used) > 0 &&
+              !setequal(samples_used, colnames(m)))
+            m[, colnames(m) %in% samples_used, drop=FALSE]
+          else m
         }, error = function(e) NULL)
         if (!is.null(mat) && mode == "foldchange" && !is.null(fc_grps)) {
           ps  <- 0.001
@@ -2984,7 +3131,7 @@ server <- function(input, output, session) {
           # Replicate pathview's node.map aggregation: sum KOs per node
           # so the scale matches what is actually painted on the map
           node_sums <- tryCatch({
-            xml_path2 <- file.path(outdir, paste0("ko", pid, ".xml"))
+            xml_path2 <- file.path(pw_kegg_cache, paste0("ko", pid, ".xml"))
             if (file.exists(xml_path2) && requireNamespace("xml2", quietly=TRUE)) {
               doc2    <- xml2::read_xml(xml_path2)
               entries2 <- xml2::xml_find_all(doc2, ".//entry[@type='ortholog']")
@@ -3022,7 +3169,8 @@ server <- function(input, output, session) {
     }, error = function(e) {
       pw_status("error")
       showNotification(paste("Pathway error:", e$message), type = "error", duration = 12)
-    })
+    }))  # end tryCatch + delay
+    }) # end isolate
   })
 
   output$pw_view_ui <- renderUI({
@@ -3034,10 +3182,21 @@ server <- function(input, output, session) {
                  tags$strong("Generate map"), "."),
         tags$div(style = "margin-top:6px; font-size:0.78rem;",
           "Example IDs: 00910 (Nitrogen), 00630 (Glyoxylate), 01100 (Metabolic pathways)")))
-    if (s == "generating") return(
-      tags$div(style = "color:var(--muted); font-size:0.85rem; padding:2rem; text-align:center;",
-        tags$div(style = "font-size:1.5rem; margin-bottom:8px;", "\u25cc"),
-        tags$div("Generating pathway map\u2026 (downloading map from KEGG servers)")))
+    if (s == "generating") {
+      pid_cur  <- isolate(input$pw_pathway_id) %||% ""
+      pw_name  <- tryCatch({
+        found <- ""
+        for (l1 in KEGG_HIERARCHY) for (l2 in l1) for (pw in l2)
+          if (identical(pw$id, pid_cur)) { found <- pw$name; break }
+        found
+      }, error=function(e) "")
+      map_label <- if (nchar(pw_name) > 0) paste0(pw_name, " [", pid_cur, "]") else pid_cur
+      return(tags$div(
+        style = "color:var(--muted); font-size:0.85rem; padding:2rem; text-align:center;",
+        tags$div(style = "font-size:1.5rem; margin-bottom:8px;", "◌"),
+        tags$div("Loading map for ", tags$strong(map_label), "…"),
+        tags$div(style = "margin-top:6px; font-size:0.78rem;", "Please wait")))
+    }
     if (s == "error") return(
       tags$div(style = "color:#c0392b; font-size:0.85rem; padding:2rem; text-align:center;",
         tags$div(style = "font-size:1.5rem; margin-bottom:8px;", "\u2715"),
@@ -3098,36 +3257,47 @@ server <- function(input, output, session) {
     # Serialize node tooltip data to JSON for JS overlay
     build_node_json <- function() {
       if (is.null(nodes) || nrow(nodes) == 0) return("[]")
-      rows_json <- apply(nodes, 1, function(r) {
-        ko_ids <- trimws(unlist(strsplit(r["ko_names"], "[[:space:]]+")))
-        ko_ids <- unique(sub("^ko:", "", ko_ids))
-        if (!is.null(kegg_names)) {
-          nms <- unique(na.omit(kegg_names[ko_ids]))
-        } else nms <- character(0)
-        ko_str   <- paste(ko_ids, collapse=", ")
-        name_str <- if (length(nms)>0) paste(nms, collapse=" / ") else r["label"]
-        tip <- if (nchar(trimws(name_str))>0) paste0(ko_str, "\n", name_str) else ko_str
-        if (!is.null(pw_mat)) {
-          val_rows <- pw_mat[rownames(pw_mat) %in% ko_ids, , drop=FALSE]
-          if (nrow(val_rows) > 0) {
-            col_sums <- colSums(val_rows, na.rm=TRUE)
-            val_str  <- paste(sapply(names(col_sums), function(s) {
-              v <- col_sums[[s]]
-              fv <- if (abs(v) >= 10000) formatC(v, digits=3, format="e")
-                    else formatC(v, digits=3, format="g")
-              paste0(s, ": ", fv)
-            }), collapse="\n")
-            tip <- paste0(tip, "\n\u2014\n", val_str)
-          } else {
-            tip <- paste0(tip, "\n\u2014\n(not in data)")
-          }
-        }
+      node_list <- apply(nodes, 1, function(r) {
         x <- as.numeric(r["x"]); y <- as.numeric(r["y"])
         w <- as.numeric(r["w"]); h <- as.numeric(r["h"])
-        tip_esc <- gsub('"', '\\\\"', gsub("\n", "\\\\n", tip))
-        sprintf('{"x":%g,"y":%g,"w":%g,"h":%g,"tip":"%s"}', x, y, w, h, tip_esc)
+        link_pid_val <- tryCatch(r["link_pid"], error=function(e) "")
+        link_pid <- if (!is.null(link_pid_val) && !is.na(link_pid_val) &&
+                        nchar(trimws(link_pid_val)) == 5) trimws(link_pid_val) else ""
+        if (nchar(link_pid) == 5) {
+          map_name <- tryCatch({
+            found <- ""
+            for (l1 in KEGG_HIERARCHY) for (l2 in l1) for (pw in l2)
+              if (identical(pw$id, link_pid)) { found <- pw$name; break }
+            found
+          }, error=function(e) "")
+          lbl <- if (nchar(map_name) > 0) map_name else as.character(r["label"])
+          tip <- paste0(link_pid, "\n", lbl, "\n\u2192 Click to open")
+        } else {
+          ko_ids <- unique(sub("^ko:", "", trimws(unlist(strsplit(r["ko_names"], "[[:space:]]+")))))
+          if (!is.null(kegg_names)) nms <- unique(na.omit(kegg_names[ko_ids]))
+          else nms <- character(0)
+          ko_str   <- paste(ko_ids, collapse=", ")
+          name_str <- if (length(nms) > 0) paste(nms, collapse=" / ") else r["label"]
+          tip <- if (nchar(trimws(name_str)) > 0) paste0(ko_str, "\n", name_str) else ko_str
+          if (!is.null(pw_mat)) {
+            val_rows <- pw_mat[rownames(pw_mat) %in% ko_ids, , drop=FALSE]
+            if (nrow(val_rows) > 0) {
+              col_sums <- colSums(val_rows, na.rm=TRUE)
+              val_str  <- paste(sapply(names(col_sums), function(s) {
+                v <- col_sums[[s]]
+                fv <- if (abs(v) >= 10000) formatC(v, digits=3, format="e")
+                      else formatC(v, digits=3, format="g")
+                paste0(s, ": ", fv)
+              }), collapse="\n")
+              tip <- paste0(tip, "\n\u2014\n", val_str)
+            } else {
+              tip <- paste0(tip, "\n\u2014\n(not in data)")
+            }
+          }
+        }
+        list(x=x, y=y, w=w, h=h, tip=tip, pid=link_pid)
       })
-      paste0("[", paste(rows_json, collapse=","), "]")
+      jsonlite::toJSON(unname(node_list), auto_unbox=TRUE)
     }
 
     make_img_map <- function(fname, map_id) {
@@ -3146,7 +3316,7 @@ server <- function(input, output, session) {
             style="max-width:100%; display:block; border:1px solid var(--border); border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,.08);",
             alt=fname),
           tags$canvas(id=paste0(map_id,"_canvas"),
-            style="position:absolute; top:0; left:0; width:100%; height:100%; cursor:crosshair;")
+            style="position:absolute; top:0; left:0; width:100%; height:100%;")
         ),
         tags$script(HTML(sprintf('
           (function() {
@@ -3158,23 +3328,41 @@ server <- function(input, output, session) {
               canvas.height = img.offsetHeight;
               var scaleX = img.offsetWidth  / img.naturalWidth;
               var scaleY = img.offsetHeight / img.naturalHeight;
-              canvas.addEventListener("mousemove", function(e) {
-                var rect = canvas.getBoundingClientRect();
-                var mx = (e.clientX - rect.left);
-                var my = (e.clientY - rect.top);
-                var hit = null;
+              function hitTest(mx, my) {
                 for (var i=0; i<nodes.length; i++) {
                   var n = nodes[i];
                   var x1 = (n.x - n.w/2) * scaleX;
                   var y1 = (n.y - n.h/2) * scaleY;
                   var x2 = (n.x + n.w/2) * scaleX;
                   var y2 = (n.y + n.h/2) * scaleY;
-                  if (mx>=x1 && mx<=x2 && my>=y1 && my<=y2) { hit=n; break; }
+                  if (mx>=x1 && mx<=x2 && my>=y1 && my<=y2) return n;
                 }
+                return null;
+              }
+              canvas.addEventListener("mousemove", function(e) {
+                var rect = canvas.getBoundingClientRect();
+                var hit = hitTest(e.clientX - rect.left, e.clientY - rect.top);
                 if (hit) {
+                  canvas.style.cursor = hit.pid && hit.pid.length === 5 ? "pointer" : "crosshair";
                   var tip = document.getElementById("pw-tooltip");
-                  if (tip) { tip.textContent = hit.tip.replace(/\\\\n/g,"\\n"); tip.style.display="block"; }
-                } else { pwHideTip(); }
+                  if (tip) { tip.textContent = hit.tip; tip.style.display="block"; }
+                } else {
+                  canvas.style.cursor = "default";
+                  pwHideTip();
+                }
+              });
+              canvas.addEventListener("click", function(e) {
+                var rect = canvas.getBoundingClientRect();
+                var hit = hitTest(e.clientX - rect.left, e.clientY - rect.top);
+                if (hit && hit.pid && hit.pid.length === 5) {
+                  pwHideTip();
+                  Shiny.setInputValue("pw_pathway_id", hit.pid, {priority:"event"});
+                  var lbl = document.getElementById("pw_selected_label");
+                  if (lbl) lbl.textContent = "Selected: " + hit.pid;
+                  document.querySelectorAll(".pw-item").forEach(function(el) {
+                    el.style.background = el.getAttribute("data-id") === hit.pid ? "var(--accent-light)" : "";
+                  });
+                }
               });
               canvas.addEventListener("mouseleave", pwHideTip);
             }
@@ -3738,4 +3926,4 @@ server <- function(input, output, session) {
     }
   )
 }
-shinyApp(ui = ui, server = server)
+shinyApp(ui = ui, server = server, options = list(launch.browser = FALSE))
