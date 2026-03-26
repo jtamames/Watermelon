@@ -68,6 +68,8 @@ library(DT)
 
 COG_CATEGORIES  <- .load_cog_categories()
 KEGG_CATEGORIES <- .load_kegg_categories()
+KEGG_L1_SHOW <- c("Cellular Processes", "Environmental Information Processing",
+                  "Genetic Information Processing", "Metabolism")
 message("COG_CATEGORIES: ", if(is.null(COG_CATEGORIES)) "NOT FOUND" else paste(nrow(COG_CATEGORIES),"rows"))
 message("KEGG_CATEGORIES: ", if(is.null(KEGG_CATEGORIES)) "NOT FOUND" else paste(nrow(KEGG_CATEGORIES),"rows"))
 
@@ -1566,187 +1568,6 @@ KEGG_HIERARCHY <- list(
       list(id="04814", name="Motor proteins"),
       list(id="04810", name="Regulation of actin cytoskeleton")
     )
-  ),
-  "5. Organismal Systems" = list(
-    "5.1 Immune system" = list(
-      list(id="04640", name="Hematopoietic cell lineage"),
-      list(id="04610", name="Complement and coagulation cascades"),
-      list(id="04611", name="Platelet activation"),
-      list(id="04613", name="Neutrophil extracellular trap formation"),
-      list(id="04620", name="Toll-like receptor signaling pathway"),
-      list(id="04621", name="NOD-like receptor signaling pathway"),
-      list(id="04622", name="RIG-I-like receptor signaling pathway"),
-      list(id="04623", name="Cytosolic DNA-sensing pathway"),
-      list(id="04625", name="C-type lectin receptor signaling pathway"),
-      list(id="04650", name="Natural killer cell mediated cytotoxicity"),
-      list(id="04612", name="Antigen processing and presentation"),
-      list(id="04660", name="T cell receptor signaling pathway"),
-      list(id="04658", name="Th1 and Th2 cell differentiation"),
-      list(id="04659", name="Th17 cell differentiation"),
-      list(id="04657", name="IL-17 signaling pathway"),
-      list(id="04662", name="B cell receptor signaling pathway"),
-      list(id="04664", name="Fc epsilon RI signaling pathway"),
-      list(id="04666", name="Fc gamma R-mediated phagocytosis"),
-      list(id="04670", name="Leukocyte transendothelial migration"),
-      list(id="04062", name="Chemokine signaling pathway")
-    ),
-    "5.2 Endocrine system" = list(
-      list(id="04911", name="Insulin secretion"),
-      list(id="04910", name="Insulin signaling pathway"),
-      list(id="04922", name="Glucagon signaling pathway"),
-      list(id="04920", name="Adipocytokine signaling pathway"),
-      list(id="03320", name="PPAR signaling pathway"),
-      list(id="04912", name="GnRH signaling pathway"),
-      list(id="04915", name="Estrogen signaling pathway"),
-      list(id="04914", name="Progesterone-mediated oocyte maturation"),
-      list(id="04917", name="Prolactin signaling pathway"),
-      list(id="04921", name="Oxytocin signaling pathway"),
-      list(id="04918", name="Thyroid hormone synthesis"),
-      list(id="04919", name="Thyroid hormone signaling pathway")
-    ),
-    "5.3 Circulatory system" = list(
-      list(id="04260", name="Cardiac muscle contraction"),
-      list(id="04261", name="Adrenergic signaling in cardiomyocytes"),
-      list(id="04270", name="Vascular smooth muscle contraction")
-    ),
-    "5.4 Digestive system" = list(
-      list(id="04970", name="Salivary secretion"),
-      list(id="04971", name="Gastric acid secretion"),
-      list(id="04972", name="Pancreatic secretion"),
-      list(id="04976", name="Bile secretion"),
-      list(id="04973", name="Carbohydrate digestion and absorption"),
-      list(id="04974", name="Protein digestion and absorption"),
-      list(id="04975", name="Fat digestion and absorption"),
-      list(id="04979", name="Cholesterol metabolism")
-    ),
-    "5.5 Excretory system" = list(
-      list(id="04960", name="Aldosterone-regulated sodium reabsorption"),
-      list(id="04961", name="Endocrine and other factor-regulated calcium reabsorption"),
-      list(id="04962", name="Vasopressin-regulated water reabsorption"),
-      list(id="04964", name="Proximal tubule bicarbonate reclamation"),
-      list(id="04966", name="Collecting duct acid secretion")
-    ),
-    "5.6 Nervous system" = list(
-      list(id="04726", name="Serotonergic synapse"),
-      list(id="04727", name="GABAergic synapse"),
-      list(id="04725", name="Cholinergic synapse"),
-      list(id="04728", name="Dopaminergic synapse"),
-      list(id="04724", name="Glutamatergic synapse"),
-      list(id="04723", name="Retrograde endocannabinoid signaling"),
-      list(id="04720", name="Long-term potentiation"),
-      list(id="04730", name="Long-term depression"),
-      list(id="04722", name="Neurotrophin signaling pathway")
-    ),
-    "5.7 Sensory system" = list(
-      list(id="04744", name="Phototransduction"),
-      list(id="04740", name="Olfactory transduction"),
-      list(id="04742", name="Taste transduction")
-    ),
-    "5.8 Development and regeneration" = list(
-      list(id="04360", name="Axon guidance"),
-      list(id="04380", name="Osteoclast differentiation")
-    ),
-    "5.9 Aging" = list(
-      list(id="04211", name="Longevity regulating pathway"),
-      list(id="04213", name="Longevity regulating pathway - multiple species")
-    ),
-    "5.10 Environmental adaptation" = list(
-      list(id="04710", name="Circadian rhythm"),
-      list(id="04713", name="Circadian entrainment"),
-      list(id="04711", name="Circadian rhythm - fly"),
-      list(id="04714", name="Thermogenesis")
-    )
-  ),
-  "6. Human Diseases" = list(
-    "6.1 Cancer: overview" = list(
-      list(id="05200", name="Pathways in cancer"),
-      list(id="05202", name="Transcriptional misregulation in cancer"),
-      list(id="05206", name="MicroRNAs in cancer"),
-      list(id="05205", name="Proteoglycans in cancer"),
-      list(id="05230", name="Central carbon metabolism in cancer"),
-      list(id="05231", name="Choline metabolism in cancer")
-    ),
-    "6.2 Cancer: specific types" = list(
-      list(id="05210", name="Colorectal cancer"),
-      list(id="05212", name="Pancreatic cancer"),
-      list(id="05225", name="Hepatocellular carcinoma"),
-      list(id="05226", name="Gastric cancer"),
-      list(id="05214", name="Glioma"),
-      list(id="05216", name="Thyroid cancer"),
-      list(id="05221", name="Acute myeloid leukemia"),
-      list(id="05220", name="Chronic myeloid leukemia"),
-      list(id="05218", name="Melanoma"),
-      list(id="05211", name="Renal cell carcinoma"),
-      list(id="05219", name="Bladder cancer"),
-      list(id="05215", name="Prostate cancer"),
-      list(id="05213", name="Endometrial cancer"),
-      list(id="05224", name="Breast cancer"),
-      list(id="05222", name="Small cell lung cancer"),
-      list(id="05223", name="Non-small cell lung cancer")
-    ),
-    "6.3 Immune diseases" = list(
-      list(id="05310", name="Asthma"),
-      list(id="05322", name="Systemic lupus erythematosus"),
-      list(id="05323", name="Rheumatoid arthritis"),
-      list(id="05320", name="Autoimmune thyroid disease"),
-      list(id="05321", name="Inflammatory bowel disease"),
-      list(id="05330", name="Allograft rejection"),
-      list(id="05332", name="Graft-versus-host disease")
-    ),
-    "6.4 Neurodegenerative diseases" = list(
-      list(id="05010", name="Alzheimer disease"),
-      list(id="05012", name="Parkinson disease"),
-      list(id="05014", name="Amyotrophic lateral sclerosis"),
-      list(id="05016", name="Huntington disease"),
-      list(id="05017", name="Spinocerebellar ataxia"),
-      list(id="05020", name="Prion disease")
-    ),
-    "6.5 Substance dependence" = list(
-      list(id="05030", name="Cocaine addiction"),
-      list(id="05031", name="Amphetamine addiction"),
-      list(id="05032", name="Morphine addiction"),
-      list(id="05033", name="Nicotine addiction"),
-      list(id="05034", name="Alcoholism")
-    ),
-    "6.6 Cardiovascular diseases" = list(
-      list(id="05418", name="Fluid shear stress and atherosclerosis"),
-      list(id="05410", name="Hypertrophic cardiomyopathy"),
-      list(id="05412", name="Arrhythmogenic right ventricular cardiomyopathy"),
-      list(id="05414", name="Dilated cardiomyopathy")
-    ),
-    "6.7 Infectious diseases: bacterial" = list(
-      list(id="05120", name="Epithelial cell signaling in Helicobacter pylori infection"),
-      list(id="05130", name="Pathogenic Escherichia coli infection"),
-      list(id="05132", name="Salmonella infection"),
-      list(id="05131", name="Shigellosis"),
-      list(id="05135", name="Yersinia infection"),
-      list(id="05133", name="Pertussis"),
-      list(id="05134", name="Legionellosis"),
-      list(id="05150", name="Staphylococcus aureus infection"),
-      list(id="05152", name="Tuberculosis"),
-      list(id="05100", name="Bacterial invasion of epithelial cells")
-    ),
-    "6.8 Infectious diseases: viral" = list(
-      list(id="05166", name="Human T-cell leukemia virus 1 infection"),
-      list(id="05170", name="Human immunodeficiency virus 1 infection"),
-      list(id="05161", name="Hepatitis B"),
-      list(id="05160", name="Hepatitis C"),
-      list(id="05171", name="Coronavirus disease - COVID-19"),
-      list(id="05164", name="Influenza A"),
-      list(id="05162", name="Measles"),
-      list(id="05168", name="Herpes simplex virus 1 infection"),
-      list(id="05163", name="Human cytomegalovirus infection"),
-      list(id="05169", name="Epstein-Barr virus infection"),
-      list(id="05165", name="Human papillomavirus infection")
-    ),
-    "6.9 Infectious diseases: parasitic" = list(
-      list(id="05140", name="Leishmaniasis"),
-      list(id="05142", name="Chagas disease"),
-      list(id="05143", name="African trypanosomiasis"),
-      list(id="05144", name="Malaria"),
-      list(id="05145", name="Toxoplasmosis"),
-      list(id="05146", name="Amoebiasis")
-    )
   )
 )
 ui <- page_navbar(
@@ -2944,7 +2765,9 @@ server <- function(input, output, session) {
     req(pt %in% c("func_cog","func_kegg","func_pfam"))
 
     if (pt == "func_cog" && !is.null(COG_CATEGORIES)) {
-      cats <- sort(unique(COG_CATEGORIES$category))
+      cats <- sort(setdiff(
+        unique(COG_CATEGORIES$category),
+        c("Function unknown", "General function prediction only")))
       tags$div(class="sidebar-box", style="margin-top:8px;",
         tags$div(class="form-label", "COG category"),
         selectInput("cog_category", NULL,
@@ -2953,11 +2776,13 @@ server <- function(input, output, session) {
 
     } else if (pt == "func_kegg" && !is.null(KEGG_CATEGORIES)) {
       # Selected state
-      sel_l1 <- isolate(input$kegg_cat_l1 %||% "")
-      sel_l2 <- isolate(input$kegg_cat_l2 %||% "")
+      sel_l1 <- input$kegg_cat_l1 %||% ""
+      sel_l2 <- input$kegg_cat_l2 %||% ""
 
       # Build collapsible tree from KEGG_CATEGORIES l1/l2
-      l1_vals <- sort(unique(KEGG_CATEGORIES$l1[!is.na(KEGG_CATEGORIES$l1)]))
+      l1_vals <- sort(intersect(
+        unique(KEGG_CATEGORIES$l1[!is.na(KEGG_CATEGORIES$l1)]),
+        KEGG_L1_SHOW))
 
       tree_items <- lapply(l1_vals, function(l1) {
         l2_vals <- sort(unique(KEGG_CATEGORIES$l2[
