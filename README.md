@@ -65,6 +65,12 @@ install.packages(
 )
 ```
 
+### plotly (optional, required for function heatmaps in Plots tab)
+
+```r
+install.packages("plotly")
+```
+
 ### vegan (optional, required for Multivariate tab)
 
 ```r
@@ -257,6 +263,7 @@ Ordination analysis on taxonomy or functional abundance data. Requires the `vega
 | DT | CRAN | Yes |
 | SQMtools | CRAN / SqueezeMeta repo | Yes |
 | pandoc | conda-forge / system | Yes (needed by DT in conda envs) |
+| plotly | CRAN | Plots tab (function heatmaps) |
 | vegan | CRAN | Multivariate tab only |
 | pathview | Bioconductor | Pathways tab only |
 | KEGGREST | Bioconductor (auto-installed with pathview) | Pathways tab only |

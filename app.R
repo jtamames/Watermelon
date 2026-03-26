@@ -4,10 +4,81 @@ library(shinyFiles)
 library(bslib)
 library(SQMtools)
 library(DT)
+library(plotly)
+
+# ── Load COG/KEGG category files from SqueezeMeta data dir ──
+message("Loading SQMxplore data, please wait...")
+
+.find_sqm_data_file <- function(fname) {
+  candidates <- c(
+    file.path("/home/tamames/anaconda3/envs/SqueezeMeta-dev/SqueezeMeta/data", fname),
+    file.path(Sys.getenv("CONDA_PREFIX"), "SqueezeMeta", "data", fname),
+    file.path(dirname(Sys.getenv("CONDA_PREFIX")), "SqueezeMeta", "data", fname),
+    file.path("/home", Sys.info()[["user"]], "anaconda3", "envs",
+              basename(Sys.getenv("CONDA_PREFIX")), "SqueezeMeta", "data", fname),
+    file.path("/home", Sys.info()[["user"]], "miniconda3", "envs",
+              basename(Sys.getenv("CONDA_PREFIX")), "SqueezeMeta", "data", fname)
+  )
+  found <- candidates[file.exists(candidates)]
+  if (length(found) > 0) found[1] else NULL
+}
+
+.load_cog_categories <- function() {
+  f <- .find_sqm_data_file("coglist.txt")
+  if (is.null(f)) return(NULL)
+  raw <- readLines(f, warn=FALSE)
+  raw <- raw[!grepl("^#", raw) & nchar(trimws(raw)) > 0]
+  parts <- strsplit(raw, "\t", fixed=TRUE)
+  # Vectorised expand: one row per id-category pair
+  ids  <- sapply(parts, function(x) if(length(x)>=1) trimws(x[1]) else NA_character_)
+  cats <- sapply(parts, function(x) if(length(x)>=3) trimws(x[3]) else NA_character_)
+  # Split multi-category entries
+  has_pipe <- grepl("|", cats, fixed=TRUE)
+  if (any(has_pipe)) {
+    single <- data.frame(id=ids[!has_pipe], category=cats[!has_pipe], stringsAsFactors=FALSE)
+    multi_cats <- strsplit(cats[has_pipe], "|", fixed=TRUE)
+    multi_ids  <- rep(ids[has_pipe], lengths(multi_cats))
+    multi_cats <- trimws(unlist(multi_cats))
+    multi <- data.frame(id=multi_ids, category=multi_cats, stringsAsFactors=FALSE)
+    df <- rbind(single, multi)
+  } else {
+    df <- data.frame(id=ids, category=cats, stringsAsFactors=FALSE)
+  }
+  df[!is.na(df$id) & !is.na(df$category) & nchar(trimws(df$category))>0, ]
+}
+
+.load_kegg_categories <- function() {
+  f <- .find_sqm_data_file("keggfun2.txt")
+  if (is.null(f)) return(NULL)
+  raw <- readLines(f, warn=FALSE)
+  raw <- raw[!grepl("^#", raw) & nchar(trimws(raw)) > 0]
+  parts <- strsplit(raw, "\t", fixed=TRUE)
+  ok <- lengths(parts) >= 4
+  parts <- parts[ok]
+  ids      <- sapply(parts, function(x) trimws(x[1]))
+  cat_strs <- sapply(parts, function(x) trimws(x[4]))
+  # Split by | to get individual pathway entries per KO
+  entries  <- strsplit(cat_strs, "|", fixed=TRUE)
+  rep_ids  <- rep(ids, lengths(entries))
+  entries  <- trimws(unlist(entries))
+  # Split each entry by ; to get hierarchy levels
+  lvls <- strsplit(entries, ";", fixed=TRUE)
+  l1 <- trimws(sapply(lvls, function(x) if(length(x)>=1) x[1] else NA_character_))
+  l2 <- trimws(sapply(lvls, function(x) if(length(x)>=2) x[2] else NA_character_))
+  l3 <- trimws(sapply(lvls, function(x) if(length(x)>=3) x[3] else NA_character_))
+  data.frame(id=rep_ids, l1=l1, l2=l2, l3=l3, stringsAsFactors=FALSE)
+}
+
+COG_CATEGORIES  <- .load_cog_categories()
+KEGG_CATEGORIES <- .load_kegg_categories()
+KEGG_L1_SHOW <- c("Cellular Processes", "Environmental Information Processing",
+                  "Genetic Information Processing", "Metabolism")
+message("Data loaded. Starting app...")
+
 `%||%` <- function(a, b) if (!is.null(a)) a else b
-# ─────────────────────────────────────────────
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 #  LIGHT THEME
-# ─────────────────────────────────────────────
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 sqm_theme <- bs_theme(
   version      = 5,
   bg           = "#f7f9fc",
@@ -20,9 +91,9 @@ sqm_theme <- bs_theme(
   base_font    = font_google("IBM Plex Sans"),
   heading_font = font_google("IBM Plex Mono")
 )
-# ─────────────────────────────────────────────
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 #  CSS
-# ─────────────────────────────────────────────
+# \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 custom_css <- "
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
 :root {
@@ -1686,7 +1757,22 @@ ui <- page_navbar(
   title = "SQMxplore",
   theme = sqm_theme,
   navbar_options = navbar_options(theme = "dark", bg = "#0e4a82"),
-  header = tagList(useShinyjs(), tags$head(tags$style(HTML(custom_css)))),
+  header = tagList(
+    useShinyjs(),
+    tags$head(tags$style(HTML(custom_css))),
+    tags$div(
+      id = "app-loading-overlay",
+      style = paste0(
+        "position:fixed; top:0; left:0; width:100%; height:100%; z-index:99999;",
+        "background:rgba(247,249,252,0.97); display:flex; flex-direction:column;",
+        "align-items:center; justify-content:center; gap:12px;"),
+      tags$div(style="font-size:2rem; color:#1a6eb5;", "\u25cc"),
+      tags$div(style="font-size:1rem; font-weight:500; color:#1a2a3a;",
+               "Please wait while loading data\u2026"),
+      tags$div(style="font-size:0.8rem; color:#7a90a8;", "SQMxplore is starting up")
+    ),
+    tags$script(HTML("$(document).ready(function() { $('#app-loading-overlay').fadeOut(400); });"))
+  ),
   nav_panel("Project",
     layout_sidebar(fillable = FALSE,
       sidebar = sidebar(width = 300, open = TRUE,
@@ -1710,6 +1796,7 @@ ui <- page_navbar(
         ),
         uiOutput("plot_controls_ui"),
         tags$div(style = "margin-top:5px;",
+        uiOutput("plot_sample_selector_ui"),
           downloadButton("download_plot", "Download PNG", class = "btn-outline-secondary w-100"))
       ),
       card(
@@ -1824,7 +1911,7 @@ server <- function(input, output, session) {
   creator_name <- reactiveVal(NULL)
   is_sqm_full  <- reactiveVal(FALSE)
 
-  # ── Dynamic plot type selector — only shows available options ──
+  # \u2500\u2500 Dynamic plot type selector \u2014 only shows available options \u2500\u2500
   output$plot_type_ui <- renderUI({
     proj <- sqm_data()
     choices <- if (is.null(proj)) {
@@ -1837,8 +1924,8 @@ server <- function(input, output, session) {
     selectInput("plot_type", NULL, choices = choices, selected = selected)
   })
 
-  # ── Dynamic table type selector — only shows available options ──
-  # ── Build each category box (only shown when choices exist) ──
+  # \u2500\u2500 Dynamic table type selector \u2014 only shows available options \u2500\u2500
+  # \u2500\u2500 Build each category box (only shown when choices exist) \u2500\u2500
   make_table_box <- function(label, input_id, choices) {
     if (length(choices) == 0) return(NULL)
     tags$div(class = "sidebar-box", style = "margin-bottom:6px;",
@@ -1892,7 +1979,7 @@ server <- function(input, output, session) {
     )
   })
 
-  # ── active_table: a reactiveVal updated by each selector.
+  # \u2500\u2500 active_table: a reactiveVal updated by each selector.
   #    assembly/taxonomy/functions use ignoreInit=TRUE (multi-option selectors).
   #    bins uses a dedicated actionButton to avoid the single-option problem.
   active_tbl_rv <- reactiveVal("none")
@@ -2048,7 +2135,7 @@ server <- function(input, output, session) {
 
     panels <- list()
 
-    # ── Project name badge (both SQM and SQMlite) ──
+    # \u2500\u2500 Project name badge (both SQM and SQMlite) \u2500\u2500
     project_name <- tryCatch(proj$misc$project_name %||% "", error=function(e) "")
     if (nchar(project_name)>0) panels[["name"]] <- tags$div(
       style="margin-bottom:12px;display:flex;align-items:center;gap:10px;",
@@ -2056,7 +2143,7 @@ server <- function(input, output, session) {
       tags$span(class="project-badge",style="font-size:0.85rem;padding:3px 10px;",project_name))
 
     if (is_sqm_full()) {
-      # ── Full SQM: parse capture.output(summary()) ──
+      # \u2500\u2500 Full SQM: parse capture.output(summary()) \u2500\u2500
       raw <- tryCatch(capture.output(summary(proj)), error=function(e) NULL)
       if (!is.null(raw)) {
         sections <- list(); current <- NULL; buf <- c(); sep_pat <- "^\\s*-{5,}\\s*$"
@@ -2113,7 +2200,7 @@ server <- function(input, output, session) {
         }
       }
     } else {
-      # ── SQMlite: capture.output(summary()) produces tab-delimited text
+      # \u2500\u2500 SQMlite: capture.output(summary()) produces tab-delimited text
       # Format:
       #   BASE PROJECT NAME: ...
       #   \t\tS1\tS2\t...          <- sample header
@@ -2141,7 +2228,7 @@ server <- function(input, output, session) {
         sep_pat <- "^\\s*-{5,}\\s*$"
         raw <- raw[!grepl(sep_pat, raw)]  # strip separator lines
 
-        # ── Helper: parse a block of tab lines into header + body df ──
+        # \u2500\u2500 Helper: parse a block of tab lines into header + body df \u2500\u2500
         parse_lite_block <- function(lines) {
           lines <- lines[nchar(trimws(lines)) > 0]
           if (length(lines) < 2) return(NULL)
@@ -2160,7 +2247,7 @@ server <- function(input, output, session) {
           df
         }
 
-        # ── Extract project name ──
+        # \u2500\u2500 Extract project name \u2500\u2500
         name_line <- grep("BASE PROJECT NAME:", raw, value = TRUE)
         if (length(name_line) > 0 && nchar(project_name) == 0) {
           project_name <- trimws(sub(".*BASE PROJECT NAME:\\s*", "", name_line[1]))
@@ -2171,7 +2258,7 @@ server <- function(input, output, session) {
             tags$span(class = "project-badge", style = "font-size:0.85rem;padding:3px 10px;", project_name))
         }
 
-        # ── Overview block: TOTAL READS + TOTAL ORFs ──
+        # \u2500\u2500 Overview block: TOTAL READS + TOTAL ORFs \u2500\u2500
         # Lines before the first section header (TAXONOMY: / FUNCTIONS:)
         first_sec <- grep("^\\t?(TAXONOMY|FUNCTIONS):", raw)
         overview_lines <- if (length(first_sec) > 0) raw[seq_len(first_sec[1] - 1)] else raw
@@ -2195,7 +2282,7 @@ server <- function(input, output, session) {
               tags$tbody(tagList(tbl_rows))))
         }
 
-        # ── TAXONOMY section ──
+        # \u2500\u2500 TAXONOMY section \u2500\u2500
         tax_start <- grep("^\\t?TAXONOMY:", raw)
         fun_start <- grep("^\\t?FUNCTIONS:", raw)
         if (length(tax_start) > 0) {
@@ -2245,7 +2332,7 @@ server <- function(input, output, session) {
             panels[["TAXONOMY"]] <- sqm_section("Taxonomy", tagList(tax_panels))
         }
 
-        # ── FUNCTIONS section ──
+        # \u2500\u2500 FUNCTIONS section \u2500\u2500
         if (length(fun_start) > 0) {
           fun_body <- raw[(fun_start[1] + 1):length(raw)]
           fun_body <- fun_body[nchar(trimws(fun_body)) > 0]
@@ -2269,7 +2356,7 @@ server <- function(input, output, session) {
       }
     }
 
-    # ── Samples (both object types) ──
+    # \u2500\u2500 Samples (both object types) \u2500\u2500
     samples <- tryCatch(proj$samples, error=function(e) NULL)
     if (!is.null(samples)) panels[["samples"]] <- sqm_section("Samples",
       tags$div(style="padding-top:2px;", tagList(lapply(samples,function(s) tags$span(class="project-badge",s)))))
@@ -2320,107 +2407,92 @@ server <- function(input, output, session) {
         )
       )
     } else if (pt %in% c("func_cog","func_kegg","func_pfam")) {
-      fun_label <- switch(pt,func_cog="COG",func_kegg="KEGG",func_pfam="PFAM")
-      tagList(
-        tags$div(class="sidebar-box",
-          if (is_sqm_full()) tagList(
-            tags$div(class="form-label",paste("Search",fun_label,"functions")),
-            tags$div(class="func-search-box", tags$span(class="search-icon","\U0001f50d"),
-              textInput("func_search",NULL,placeholder=paste0("e.g. ",switch(pt,func_cog="COG0001, transport",func_kegg="K00001, ribosome",func_pfam="PF00001, kinase")))),
-            tags$div(class="func-search-hint","Comma-separated. Empty \u2192 top N functions."),
-            uiOutput("func_search_status")
-          ) else tags$div(class="func-search-hint",style="color:#c0392b;","\u26a0 Function search requires a full SQM object.")
-        ),
-        tags$div(class="sidebar-box",style="margin-top:8px;",
-          tags$div(class="form-label","Count type"), uiOutput("func_count_ui"),
-          tags$div(class="form-label",style="margin-top:4px;","No. of functions"), uiOutput("n_funcs_ui")
-        ),
-        tags$div(class="sidebar-box",style="margin-top:8px;",
-          tags$div(style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--blue);margin-bottom:5px;","Format plot"),
-          tags$div(style="display:grid;grid-template-columns:1fr 1fr;gap:4px;",
-            tags$div(tags$div(class="form-label","Width (px)"),  numericInput("func_plot_width", NULL,value=800,min=200,max=3000,step=50)),
-            tags$div(tags$div(class="form-label","Height (px)"), numericInput("func_plot_height",NULL,value=560,min=200,max=3000,step=50))
-          ),
-          tags$div(class="form-label",style="margin-top:4px;","Font size"),
-          numericInput("func_base_size",NULL,value=11,min=6,max=24,step=1)
-        )
-      )
-    } else NULL
-  })
-  output$func_search_status <- renderUI({
-    pt <- input$plot_type; req(pt %in% c("func_cog","func_kegg","func_pfam")); req(sqm_data())
-    pattern <- build_func_pattern(input$func_search %||% ""); if (is.null(pattern)) return(NULL)
-    fun_level <- switch(pt,func_cog="COG",func_kegg="KEGG",func_pfam="PFAM")
-    n <- tryCatch({ ps <- subsetFun(sqm_data(),fun=pattern,ignore_case=TRUE,fixed=FALSE); nrow(ps$functions[[fun_level]]$abund) }, error=function(e) 0L)
-    if (n==0) tags$div(class="func-nomatch-badge","\u2715 No matches")
-    else tags$div(class="func-match-badge",paste0("\u2713 ",n," function",if(n!=1)"s" else ""))
-  })
-  output$tax_search_status <- renderUI({
-    req(input$plot_type=="taxonomy_bar"); req(sqm_data())
-    search_text <- trimws(input$tax_search %||% ""); if (nchar(search_text)==0) return(NULL)
-    rank <- input$tax_rank %||% "phylum"
-    all_taxa <- tryCatch(rownames(sqm_data()$taxa[[rank]]$abund), error=function(e) character(0))
-    terms <- trimws(unlist(strsplit(search_text,"[,;]+")));  terms <- terms[nchar(terms)>0]
-    matched <- unique(unlist(lapply(terms,function(t) all_taxa[grepl(t,all_taxa,ignore.case=TRUE)])))
-    if (length(matched)==0) tags$div(class="func-nomatch-badge","\u2715 No matches")
-    else tags$div(class="func-match-badge",paste0("\u2713 ",length(matched)," taxon",if(length(matched)!=1)"a" else ""))
-  })
-  output$n_funcs_ui   <- renderUI({ numericInput("n_funcs",NULL,value=20,min=1,max=200,step=1) })
-  output$func_count_ui <- renderUI({
-    pt <- input$plot_type; req(pt %in% c("func_cog","func_kegg","func_pfam"))
-    fun_level <- switch(pt,func_cog="COG",func_kegg="KEGG",func_pfam="PFAM")
-    counts <- if (!is.null(sqm_data())) available_func_counts(sqm_data(),fun_level) else c("Copy number"="copy_number")
-    selectInput("func_count",NULL,choices=counts,selected=if("copy_number"%in%counts)"copy_number" else counts[[1]])
-  })
-  output$sqm_plot_ui <- renderUI({
-    pt <- input$plot_type
-    is_tax  <- !is.null(pt) && pt=="taxonomy_bar"
-    is_func <- !is.null(pt) && pt %in% c("func_cog","func_kegg","func_pfam")
-    h <- if(is_tax) input$tax_plot_height %||% 560 else if(is_func) input$func_plot_height %||% 560 else 560
-    w <- if(is_tax) input$tax_plot_width  %||% 800 else if(is_func) input$func_plot_width  %||% 800 else NULL
-    style <- if(!is.null(w)) paste0("width:",w,"px; overflow-x:auto;") else "width:100%;"
-    tags$div(style=style,
-      plotOutput("sqm_plot", width=if(!is.null(w)) paste0(w,"px") else "100%", height=paste0(h,"px")))
-  })
-  plot_reactive <- reactive({
-    req(sqm_data()); proj <- sqm_data(); pt <- input$plot_type
-    req(!is.null(pt) && pt != "none")
-    if (pt=="taxonomy_bar") {
-      search_text <- if(is_sqm_full()) trimws(input$tax_search %||% "") else ""
-      if (nchar(search_text)>0) {
-        rank <- input$tax_rank %||% "phylum"
-        all_taxa <- tryCatch(rownames(proj$taxa[[rank]]$abund),error=function(e) character(0))
-        terms <- trimws(unlist(strsplit(search_text,"[,;]+")));  terms <- terms[nchar(terms)>0]
-        matched <- unique(unlist(lapply(terms,function(t) all_taxa[grepl(t,all_taxa,ignore.case=TRUE)])))
-        if (length(matched)==0) { showNotification(paste0("No taxa found matching: \"",search_text,"\""),type="warning",duration=5); return(NULL) }
-        proj_sub <- tryCatch(subsetTax(proj,rank=rank,tax=matched),error=function(e) NULL)
-        if (is.null(proj_sub)) { showNotification("subsetTax failed.",type="error",duration=5); return(NULL) }
-        plotTaxonomy(proj_sub,rank=rank,count=input$tax_count,N=input$n_taxa,base_size=input$tax_base_size %||% 11,
-          ignore_unmapped=isTRUE(input$tax_ignore_unmapped),ignore_unclassified=isTRUE(input$tax_ignore_unclassified),
-          no_partial_classifications=isTRUE(input$tax_no_partial_classifications),rescale=isTRUE(input$tax_rescale),
-          max_scale_value=if(is.na(input$tax_max_scale_value)) NULL else input$tax_max_scale_value)
-      } else {
-        plotTaxonomy(proj,rank=input$tax_rank,count=input$tax_count,N=input$n_taxa,base_size=input$tax_base_size %||% 11,
-          ignore_unmapped=isTRUE(input$tax_ignore_unmapped),ignore_unclassified=isTRUE(input$tax_ignore_unclassified),
-          no_partial_classifications=isTRUE(input$tax_no_partial_classifications),rescale=isTRUE(input$tax_rescale),
-          max_scale_value=if(is.na(input$tax_max_scale_value)) NULL else input$tax_max_scale_value)
-      }
-    } else if (pt %in% c("func_cog","func_kegg","func_pfam")) {
       fun_level <- switch(pt,func_cog="COG",func_kegg="KEGG",func_pfam="PFAM")
       req(nchar(input$func_count %||% "") > 0)
       req(!is.null(input$n_funcs))
-      search_text <- if(is_sqm_full()) trimws(input$func_search %||% "") else ""
-      if (nchar(search_text)>0) {
-        pattern <- build_func_pattern(search_text)
-        proj_sub <- tryCatch(subsetFun(proj,fun=pattern,ignore_case=TRUE,fixed=FALSE),error=function(e) NULL)
-        n_matches <- if(!is.null(proj_sub)) tryCatch(nrow(proj_sub$functions[[fun_level]]$abund),error=function(e) 0L) else 0L
-        if (n_matches==0) { showNotification(paste0("No ",fun_level," functions found matching: \"",search_text,"\""),type="warning",duration=5); return(NULL) }
-        plotFunctions(proj_sub,fun_level=fun_level,count=input$func_count,N=input$n_funcs,base_size=input$func_base_size %||% 11)
-      } else {
-        plotFunctions(proj,fun_level=fun_level,count=input$func_count,N=input$n_funcs,base_size=input$func_base_size %||% 11)
+      cnt   <- input$func_count
+      n_top <- input$n_funcs
+      mat   <- tryCatch(as.matrix(proj$functions[[fun_level]][[cnt]]), error=function(e) NULL)
+      req(!is.null(mat) && nrow(mat) > 0)
+      # Search filter
+      search_text <- trimws(input$func_search %||% "")
+      if (nchar(search_text) > 0) {
+        all_ids   <- rownames(mat)
+        all_names <- tryCatch(proj$misc[[paste0(fun_level,"_names")]], error=function(e) character(0))
+        terms <- trimws(unlist(strsplit(search_text, "[,;]+")))
+        terms <- terms[nchar(terms) > 0]
+        matched <- unique(unlist(lapply(terms, function(t) {
+          by_id   <- all_ids[grepl(t, all_ids, ignore.case=TRUE)]
+          by_name <- if (length(all_names)>0) names(all_names)[grepl(t, all_names, ignore.case=TRUE)] else character(0)
+          union(by_id, by_name[by_name %in% all_ids])
+        })))
+        if (length(matched)==0) {
+          showNotification(paste0("No ",fun_level," functions found matching: \"",search_text,"\""),
+                           type="warning", duration=5); return(NULL)
+        }
+        mat <- mat[rownames(mat) %in% matched, , drop=FALSE]
       }
+      # Select top N by row mean
+      if (nrow(mat) > n_top) {
+        top_idx <- order(rowMeans(mat, na.rm=TRUE), decreasing=TRUE)[seq_len(n_top)]
+        mat <- mat[top_idx, , drop=FALSE]
+      }
+      mat  # return matrix — plotly render handles the rest
     } else if (pt=="bins") { plotBins(proj) }
   })
+  output$sqm_func_plot <- renderPlotly({
+    pt <- input$plot_type
+    req(pt %in% c("func_cog","func_kegg","func_pfam"))
+    mat <- plot_reactive()
+    req(is.matrix(mat) && nrow(mat) > 0)
+    fun_level <- switch(pt,func_cog="COG",func_kegg="KEGG",func_pfam="PFAM")
+    proj <- sqm_data()
+    # Get function names for row labels
+    all_names <- tryCatch(proj$misc[[paste0(fun_level,"_names")]], error=function(e) NULL)
+    row_labels <- if (!is.null(all_names)) {
+      nms <- all_names[rownames(mat)]
+      ifelse(is.na(nms) | nms=="", rownames(mat), paste0(rownames(mat)," - ",nms))
+    } else rownames(mat)
+    # Log scale
+    display_mat <- if (isTRUE(input$func_log_scale)) log10(mat + 0.001) else mat
+    # Cluster rows
+    if (isTRUE(input$func_cluster_rows) && nrow(display_mat) > 2) {
+      ord <- tryCatch(hclust(dist(display_mat))$order, error=function(e) seq_len(nrow(display_mat)))
+      display_mat <- display_mat[ord, , drop=FALSE]
+      row_labels  <- row_labels[ord]
+    }
+    # Color palette
+    pal <- input$func_palette %||% "YlOrRd"
+    colorscale <- switch(pal,
+      "viridis" = "Viridis",
+      "RdBu"    = "RdBu",
+      pal)
+    cnt_label <- c(abund="Raw abundance",percent="Percentage",bases="Bases",
+                   cpm="CPM",tpm="TPM",copy_number="Copy number")[input$func_count]
+    cnt_label <- if(is.na(cnt_label)) input$func_count else cnt_label
+    if (isTRUE(input$func_log_scale)) cnt_label <- paste0("log10(",cnt_label,")")
+    plot_ly(
+      x = colnames(display_mat),
+      y = row_labels,
+      z = display_mat,
+      type = "heatmap",
+      colorscale = colorscale,
+      reversescale = pal %in% c("Blues","Greens","Purples"),
+      hovertemplate = paste0(
+        "<b>%{y}</b><br>",
+        "Sample: %{x}<br>",
+        cnt_label, ": %{z:.4g}<extra></extra>"),
+      colorbar = list(title=cnt_label)
+    ) |> layout(
+      margin = list(l=200, b=80, r=20, t=30),
+      xaxis  = list(tickangle=-45, title=""),
+      yaxis  = list(title="", autorange="reversed"),
+      paper_bgcolor = "white",
+      plot_bgcolor  = "white"
+    ) |> config(displayModeBar=TRUE, displaylogo=FALSE,
+                modeBarButtonsToRemove=list("lasso2d","select2d"))
+  })
+
   output$sqm_plot <- renderPlot({ plot_reactive() }, bg="#ffffff")
   output$plot_status_badge <- renderUI({
     if (is.null(sqm_data())) tags$span(class="badge",style="background:#eef2f7;color:#7a90a8;font-size:0.72rem;border:1px solid #d0dae6;","No project")
@@ -2449,7 +2521,7 @@ server <- function(input, output, session) {
       checkboxGroupInput("selected_samples", NULL, choices = samples, selected = samples)
     )
   })
-  # ── Helper: enrich function table with Name / Path columns ──
+  # \u2500\u2500 Helper: enrich function table with Name / Path columns \u2500\u2500
   # File format: header row is "\tName\tPath" (first col empty = row ID)
   #              data rows:    "K00001\talcohol dehydrogenase...\tMetabolism;..."
   enrich_fun_table <- function(proj, db, d) {
@@ -2542,9 +2614,9 @@ server <- function(input, output, session) {
       write.csv(df, file, row.names=FALSE)
     }
   )
-  # ─────────────────────────────────────────
+  # \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   #  KRONA
-  # ─────────────────────────────────────────
+  # \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   krona_file   <- reactiveVal(NULL)
   krona_status <- reactiveVal("idle")
   kt_available <- reactive({
@@ -2612,7 +2684,7 @@ server <- function(input, output, session) {
     # Read Krona HTML and patch it so the top bar is not clipped inside the iframe
     html_raw <- paste(readLines(kf, warn = FALSE), collapse = "
 ")
-    # Krona uses position:fixed for #options — change to position:absolute so it
+    # Krona uses position:fixed for #options \u2014 change to position:absolute so it
     # stays within the iframe document flow and is never clipped by the frame edge
     patch_css <- paste0(
       "<style>",
@@ -2638,9 +2710,9 @@ server <- function(input, output, session) {
     content  = function(file) { kf<-krona_file(); req(kf,file.exists(kf)); file.copy(kf,file) }
   )
 
-  # ═══════════════════════════════════════════════════════
-  # Pathways tab — exportPathway (SQMtools wrapper for pathview)
-  # ═══════════════════════════════════════════════════════
+  # \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+  # Pathways tab \u2014 exportPathway (SQMtools wrapper for pathview)
+  # \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
   pw_status   <- reactiveVal("idle")   # idle | generating | ready | error
   pw_img_dir   <- reactiveVal(NULL)     # tempdir where PNGs were written
   pw_kegg_cache <- file.path(tempdir(), "sqmxplore_kegg_cache")  # shared XML/PNG cache
@@ -2649,13 +2721,13 @@ server <- function(input, output, session) {
   pw_nodes     <- reactiveVal(NULL)    # data.frame: ko_ids, x, y, w, h, label, name
   pw_pathway_choices <- reactiveVal(NULL)  # named vector: "Name [id]" = "id"
 
-  # ── Pathway tree is static; just signal ready on project load ──
+  # \u2500\u2500 Pathway tree is static; just signal ready on project load \u2500\u2500
   observeEvent(sqm_data(), {
     req(sqm_data())
     pw_pathway_choices(TRUE)   # just a flag to trigger renderUI
   })
 
-  # ── Pathway selector: populated on project load ──
+  # \u2500\u2500 Pathway selector: populated on project load \u2500\u2500
   output$pw_pathway_select_ui <- renderUI({
     # Show placeholder if project not loaded
     if (is.null(pw_pathway_choices()) || is.null(sqm_data())) {
@@ -2664,7 +2736,7 @@ server <- function(input, output, session) {
     }
 
     # Build collapsible tree from KEGG_HIERARCHY
-    # Uses HTML details/summary — no JS needed
+    # Uses HTML details/summary \u2014 no JS needed
     search_box <- tags$input(
       id = "pw_search", type = "text",
       placeholder = "Search pathway\u2026",
@@ -2813,13 +2885,161 @@ server <- function(input, output, session) {
     )
   })
 
+  output$func_category_ui <- renderUI({
+    pt <- input$plot_type
+    req(pt %in% c("func_cog","func_kegg","func_pfam"))
+
+    if (pt == "func_cog" && !is.null(COG_CATEGORIES)) {
+      cats <- sort(setdiff(
+        unique(COG_CATEGORIES$category),
+        c("Function unknown", "General function prediction only")))
+      tags$div(class="sidebar-box", style="margin-top:8px;",
+        tags$div(class="form-label", "COG category"),
+        selectInput("cog_category", NULL,
+          choices  = c("All categories" = "", setNames(cats, cats)),
+          selected = input$cog_category %||% ""))
+
+    } else if (pt == "func_kegg" && !is.null(KEGG_CATEGORIES)) {
+      # Selected state
+      sel_l1 <- isolate(input$kegg_cat_l1 %||% "")
+      sel_l2 <- isolate(input$kegg_cat_l2 %||% "")
+
+      # Build collapsible tree from KEGG_CATEGORIES l1/l2
+      l1_vals <- sort(intersect(
+        unique(KEGG_CATEGORIES$l1[!is.na(KEGG_CATEGORIES$l1)]),
+        KEGG_L1_SHOW))
+
+      tree_items <- lapply(l1_vals, function(l1) {
+        l2_vals <- sort(unique(KEGG_CATEGORIES$l2[
+          KEGG_CATEGORIES$l1 == l1 & !is.na(KEGG_CATEGORIES$l2)]))
+
+        l2_items <- lapply(l2_vals, function(l2) {
+          is_sel <- sel_l1 == l1 && sel_l2 == l2
+          tags$div(
+            class = "pw-item",
+            style = paste0(
+              "padding:2px 4px 2px 8px; cursor:pointer; font-size:0.75rem;",
+              "border-radius:3px;",
+              if (is_sel) "background:var(--accent-light);" else ""),
+            onclick = sprintf(
+              "event.stopPropagation();
+               Shiny.setInputValue('kegg_cat_l1','%s',{priority:'event'});
+               Shiny.setInputValue('kegg_cat_l2','%s',{priority:'event'});
+               document.querySelectorAll('.pw-item').forEach(function(el){el.style.background=''});
+               this.style.background='var(--accent-light)';",
+              gsub("'","\\\\'",l1), gsub("'","\\\\'",l2)),
+            l2)
+        })
+
+        # Add "All in <l1>" item at top of each l1 group
+        is_sel_l1 <- sel_l1 == l1 && sel_l2 == ""
+        all_item <- tags$div(
+          class = "pw-item",
+          style = paste0(
+            "padding:2px 4px 2px 8px; cursor:pointer; font-size:0.75rem;",
+            "border-radius:3px; font-style:italic; color:var(--muted);",
+            if (is_sel_l1) "background:var(--accent-light);" else ""),
+          onclick = sprintf(
+            "event.stopPropagation();
+             Shiny.setInputValue('kegg_cat_l1','%s',{priority:'event'});
+             Shiny.setInputValue('kegg_cat_l2','',{priority:'event'});
+             document.querySelectorAll('.pw-item').forEach(function(el){el.style.background=''});
+             this.style.background='var(--accent-light)';",
+            gsub("'","\\\\'",l1)),
+          paste0("All ", l1))
+
+        tags$details(
+          if (sel_l1 == l1) list(open=NA) else list(),
+          style = "margin-bottom:2px;",
+          tags$summary(
+            style = paste0(
+              "font-size:0.8rem; font-weight:700; color:var(--text);",
+              "cursor:pointer; padding:3px 2px; list-style:none;",
+              "display:flex; align-items:center; gap:4px;"),
+            tags$span(class="pw-chevron", style="font-size:0.6rem;", "\u25b6"),
+            l1),
+          all_item,
+          l2_items
+        )
+      })
+
+      # "All categories" item
+      all_cats_item <- tags$div(
+        style = paste0(
+          "padding:3px 4px; cursor:pointer; font-size:0.78rem;",
+          "border-radius:3px; font-style:italic; color:var(--muted); margin-bottom:4px;",
+          if (sel_l1=="" && sel_l2=="") "background:var(--accent-light);" else ""),
+        onclick = "Shiny.setInputValue('kegg_cat_l1','',{priority:'event'});
+                   Shiny.setInputValue('kegg_cat_l2','',{priority:'event'});
+                   document.querySelectorAll('.pw-item').forEach(function(el){el.style.background=''});
+                   this.style.background='var(--accent-light)';",
+        "All categories")
+
+      # Selected label
+      sel_label <- if (nchar(sel_l1) > 0)
+        paste0(sel_l1, if (nchar(sel_l2)>0) paste0(" \u203a ", sel_l2) else " (all)")
+      else "All categories"
+
+      tags$div(class="sidebar-box", style="margin-top:8px;",
+        tags$div(class="form-label", "KEGG category"),
+        tags$div(
+          style = paste0(
+            "font-size:0.75rem; padding:3px 6px; margin-bottom:4px;",
+            "background:var(--accent-light); border-radius:3px;",
+            "border:1px solid var(--border); color:var(--text);"),
+          id = "kegg_cat_label",
+          sel_label),
+        tags$div(
+          style = paste0(
+            "max-height:220px; overflow-y:auto; border:1px solid var(--border);",
+            "border-radius:4px; padding:4px; background:var(--surface);"),
+          all_cats_item,
+          tree_items)
+      )
+    } else NULL
+  })
+
+
+  output$plot_sample_selector_ui <- renderUI({
+    req(sqm_data())
+    samples <- tryCatch(sqm_data()$misc$samples, error=function(e) NULL)
+    req(samples)
+    tags$div(class = "sidebar-box",
+      tags$div(class = "form-label", "Samples"),
+      tags$div(style = "display:flex; flex-wrap:wrap; gap:2px; margin-top:2px;",
+        lapply(samples, function(s) {
+          is_sel <- is.null(input$plot_samples) || s %in% input$plot_samples
+          tags$label(
+            style = paste0(
+              "display:inline-flex; align-items:center; gap:3px;",
+              "font-size:0.72rem; padding:2px 5px; border-radius:3px; cursor:pointer;",
+              "border:1px solid ", if (is_sel) "#3b9ede" else "var(--border)", ";",
+              "background:", if (is_sel) "rgba(59,158,222,0.08)" else "transparent", ";"),
+            tags$input(
+              type="checkbox", name="plot_samples", value=s,
+              checked = if (is_sel) NA else NULL,
+              style="margin:0; width:11px; height:11px;",
+              onclick = paste0(
+                "var cb=this; var vals=[];",
+                "document.querySelectorAll('input[name=plot_samples]').forEach(function(el){",
+                "if(el.checked) vals.push(el.value);});",
+                "Shiny.setInputValue('plot_samples', vals, {priority:'event'});",
+                "var lbl=cb.closest('label');",
+                "lbl.style.borderColor=cb.checked?'#3b9ede':'var(--border)';",
+                "lbl.style.background=cb.checked?'rgba(59,158,222,0.08)':'transparent';")),
+            s)
+        })
+      )
+    )
+  })
+
   output$pw_count_ui <- renderUI({
     all_counts <- c("Copy number" = "copy_number", "TPM" = "tpm",
                     "Raw abundances" = "abund", "Percentages" = "percent",
                     "Base counts" = "bases")
     proj <- sqm_data()
     if (is.null(proj)) {
-      # No project loaded yet — show all, exportPathway will validate
+      # No project loaded yet \u2014 show all, exportPathway will validate
       avail <- all_counts
     } else {
       avail <- Filter(function(m) {
@@ -2904,16 +3124,16 @@ server <- function(input, output, session) {
         if (length(grpA) > 0 && length(grpB) > 0)
           fc_grps <- list(grpA, grpB)
       }
-      # Normalise sample selection: NULL / empty / all-selected → same key
+      # Normalise sample selection: NULL / empty / all-selected \u2192 same key
       all_smp_names <- tryCatch(sort(sqm_data()$misc$samples), error=function(e) character(0))
       sel_smp_raw   <- input$pw_samples
       sel_smp_norm  <- if (is.null(sel_smp_raw) || length(sel_smp_raw) == 0 ||
                            setequal(sel_smp_raw, all_smp_names))
                          all_smp_names
                        else sort(sel_smp_raw)
-      # Shared KEGG cache dir (XML + orig PNG) — reused across runs
+      # Shared KEGG cache dir (XML + orig PNG) \u2014 reused across runs
       dir.create(pw_kegg_cache, showWarnings = FALSE, recursive = TRUE)
-      # Per-run output dir — unique per pathway+count+mode+log+samples+fc
+      # Per-run output dir \u2014 unique per pathway+count+mode+log+samples+fc
       fc_key  <- if (!is.null(fc_grps))
                    paste0("fc_", paste(sort(fc_grps[[1]]),collapse=""),
                           "_vs_", paste(sort(fc_grps[[2]]),collapse=""))
@@ -2995,7 +3215,7 @@ server <- function(input, output, session) {
           file.copy(from_outdir, to_cache)
       }
 
-      # ── Parse KGML to extract node positions for image map ──
+      # \u2500\u2500 Parse KGML to extract node positions for image map \u2500\u2500
       xml_nodes <- tryCatch({
         if (!requireNamespace("xml2", quietly=TRUE)) stop("xml2 not available")
         xml_path <- file.path(pw_kegg_cache, paste0("ko", pid, ".xml"))
@@ -3030,7 +3250,7 @@ server <- function(input, output, session) {
 
         doc <- xml2::read_xml(xml_path)
 
-        # ── Ortholog nodes (enzyme boxes) ──
+        # \u2500\u2500 Ortholog nodes (enzyme boxes) \u2500\u2500
         entries <- xml2::xml_find_all(doc, ".//entry[@type='ortholog']")
         rows <- lapply(entries, function(e) {
           ko_names <- trimws(xml2::xml_attr(e, "name"))
@@ -3045,7 +3265,7 @@ server <- function(input, output, session) {
           list(ko_names=ko_names, x=x, y=y, w=w, h=h, label=label, link_pid="")
         })
 
-        # ── Map-link nodes (rounded rectangles linking to other pathways) ──
+        # \u2500\u2500 Map-link nodes (rounded rectangles linking to other pathways) \u2500\u2500
         map_entries <- xml2::xml_find_all(doc, ".//entry[@type='map']")
         map_rows <- lapply(map_entries, function(e) {
           entry_name <- trimws(xml2::xml_attr(e, "name"))  # e.g. "path:ko00020"
@@ -3083,7 +3303,7 @@ server <- function(input, output, session) {
       # Collect PNGs written by pathview (exclude legends and base map)
       pngs_all <- list.files(outdir, pattern = "[.]png$", full.names = TRUE)
       pngs_all <- pngs_all[!grepl("[.]legend[.]", basename(pngs_all))]
-      # pathview writes the original base PNG (ko<pid>.png) alongside the output —
+      # pathview writes the original base PNG (ko<pid>.png) alongside the output \u2014
       # exclude it: keep only files that contain the output_suffix in the name
       suffix_pat <- paste0("sqmxplore_", pid)
       pngs_all <- pngs_all[grepl(suffix_pat, basename(pngs_all), fixed=TRUE)]
@@ -3100,7 +3320,7 @@ server <- function(input, output, session) {
                  ". Check that the pathway ID is valid and has KEGG KO annotations."),
           type = "error", duration = 10)
       } else {
-        # Compute legend info — use the actual selected samples
+        # Compute legend info \u2014 use the actual selected samples
         samples_used <- sel_smp_norm
         if (length(samples_used) == 0)
           samples_used <- tryCatch(proj$misc$samples, error=function(e) character(0))
@@ -3193,8 +3413,8 @@ server <- function(input, output, session) {
       map_label <- if (nchar(pw_name) > 0) paste0(pw_name, " [", pid_cur, "]") else pid_cur
       return(tags$div(
         style = "color:var(--muted); font-size:0.85rem; padding:2rem; text-align:center;",
-        tags$div(style = "font-size:1.5rem; margin-bottom:8px;", "◌"),
-        tags$div("Loading map for ", tags$strong(map_label), "…"),
+        tags$div(style = "font-size:1.5rem; margin-bottom:8px;", "\u25cc"),
+        tags$div("Loading map for ", tags$strong(map_label), "\u2026"),
         tags$div(style = "margin-top:6px; font-size:0.78rem;", "Please wait")))
     }
     if (s == "error") return(
@@ -3211,7 +3431,7 @@ server <- function(input, output, session) {
     nodes <- pw_nodes()
     kegg_names <- tryCatch(sqm_data()$misc$KEGG_names, error=function(e) NULL)
 
-    # CSS tooltip that follows the cursor — fast, styleable, no delay
+    # CSS tooltip that follows the cursor \u2014 fast, styleable, no delay
     tooltip_css <- tags$style(HTML("
       #pw-tooltip {
         position: fixed; pointer-events: none; z-index: 9999;
@@ -3381,7 +3601,7 @@ server <- function(input, output, session) {
     # Prepend tooltip infrastructure once
     img_tags <- c(list(tooltip_css, tooltip_div, tooltip_js), img_tags)
 
-    # ── Inline legend ──
+    # \u2500\u2500 Inline legend \u2500\u2500
     cnt_labels <- c(abund="Raw abundance", percent="Percentage", bases="Bases",
                     tpm="TPM", copy_number="Copy number")
     cnt_lbl <- if (!is.null(leg) && leg$cnt %in% names(cnt_labels))
@@ -3484,9 +3704,9 @@ server <- function(input, output, session) {
     }
   )
 
-  # ═══════════════════════════════════════════════════════
-  # Multivariate tab — PCA via vegan::rda
-  # ═══════════════════════════════════════════════════════
+  # \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
+  # Multivariate tab \u2014 PCA via vegan::rda
+  # \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
   mv_status  <- reactiveVal("idle")   # idle | ready | error
   mv_pca_res <- reactiveVal(NULL)     # list: rda object + metadata
 
@@ -3507,7 +3727,7 @@ server <- function(input, output, session) {
     span(if (method == "nmds") "NMDS" else "PCA")
   })
 
-  # ── Unified sidebar controls (sidebar-box style, method-conditional) ──
+  # \u2500\u2500 Unified sidebar controls (sidebar-box style, method-conditional) \u2500\u2500
   output$mv_sidebar_controls <- renderUI({
     req(sqm_data()); proj <- sqm_data()
     method    <- input$mv_method    %||% "pca"
@@ -3541,13 +3761,13 @@ server <- function(input, output, session) {
     samples <- tryCatch(proj$misc$samples, error = function(e) NULL)
 
     tagList(
-      # ── Box 1: Analysis type ──
+      # \u2500\u2500 Box 1: Analysis type \u2500\u2500
       tags$div(class = "sidebar-box",
         tags$div(class = "form-label", "Analysis type"),
         selectInput("mv_method", NULL,
           choices = c("PCA" = "pca", "NMDS" = "nmds"), selected = method)),
 
-      # ── Box 2: Data type + Rank/DB ──
+      # \u2500\u2500 Box 2: Data type + Rank/DB \u2500\u2500
       tags$div(class = "sidebar-box",
         tags$div(class = "form-label", "Data type"),
         selectInput("mv_data_type", NULL,
@@ -3559,7 +3779,7 @@ server <- function(input, output, session) {
             selected = input$mv_rank_db))
       ),
 
-      # ── Box 3: Metric + Distance/Normalization + N features + Exclude unclassified ──
+      # \u2500\u2500 Box 3: Metric + Distance/Normalization + N features + Exclude unclassified \u2500\u2500
       tags$div(class = "sidebar-box",
         if (length(metrics) > 0) tagList(
           tags$div(class = "form-label", "Metric"),
@@ -3592,7 +3812,7 @@ server <- function(input, output, session) {
 
       # (Feature labels checkbox moved to plot controls bar)
 
-      # ── Box 5: Samples — inline chips ──
+      # \u2500\u2500 Box 5: Samples \u2014 inline chips \u2500\u2500
       if (!is.null(samples))
         tags$div(class = "sidebar-box",
           tags$div(class = "form-label", "Samples"),
@@ -3624,7 +3844,7 @@ server <- function(input, output, session) {
     )
   })
 
-  # ── Run PCA ──
+  # \u2500\u2500 Run PCA \u2500\u2500
   observeEvent(input$do_pca, {
     req(sqm_data(), input$mv_rank_db, input$mv_metric)
     method <- input$mv_method %||% "pca"
@@ -3643,7 +3863,7 @@ server <- function(input, output, session) {
       excl_u  <- isTRUE(input$mv_exclude_unclassified)
       sel_smp <- input$mv_samples
 
-      # ── Get matrix ──
+      # \u2500\u2500 Get matrix \u2500\u2500
       mat <- if (input$mv_data_type == "taxonomy") {
         rank <- sub("^tax_", "", rdb)
         as.matrix(proj$taxa[[rank]][[metric]])
@@ -3673,7 +3893,7 @@ server <- function(input, output, session) {
       mat       <- mat[top_idx, , drop = FALSE]
       if (nrow(mat) < 2) stop("Not enough features after filtering.")
 
-      # ── Normalization (PCA only — NMDS uses raw mat via distance metric) ──
+      # \u2500\u2500 Normalization (PCA only \u2014 NMDS uses raw mat via distance metric) \u2500\u2500
       mat_t <- if (method == "pca") {
         norm <- input$mv_norm %||% "clr"
         t(switch(norm,
@@ -3686,11 +3906,11 @@ server <- function(input, output, session) {
       }  # samples as rows
 
       if (method == "pca") {
-        # ── PCA via vegan::rda ──
+        # \u2500\u2500 PCA via vegan::rda \u2500\u2500
         ord <- vegan::rda(mat_t, scale = FALSE)
         eig    <- ord$CA$eig
         var_ex <- round(100 * eig / sum(eig), 1)
-        # ── PCA quality warnings ──
+        # \u2500\u2500 PCA quality warnings \u2500\u2500
         pca_warns <- c()
         pc1    <- var_ex[1]
         pc1pc2 <- var_ex[1] + var_ex[2]
@@ -3721,7 +3941,7 @@ server <- function(input, output, session) {
         ))
 
       } else {
-        # ── NMDS via vegan::metaMDS ──
+        # \u2500\u2500 NMDS via vegan::metaMDS \u2500\u2500
         # Use Bray-Curtis on CLR-transformed data
         dist_sel <- input$mv_dist %||% "bray"
         if (ncol(mat) < 3) stop("NMDS requires at least 3 samples.")
@@ -3748,9 +3968,9 @@ server <- function(input, output, session) {
           }
         )
         stress_warn <- if (ord$stress < 0.01)
-          "Warning: stress is near zero — you may have too few samples for a meaningful NMDS."
+          "Warning: stress is near zero \u2014 you may have too few samples for a meaningful NMDS."
         else if (ord$stress > 0.2)
-          "Warning: stress > 0.2 — ordination may not be reliable. Consider increasing sample size."
+          "Warning: stress > 0.2 \u2014 ordination may not be reliable. Consider increasing sample size."
         else NULL
         mv_pca_res(list(
           method      = "nmds",
@@ -3768,7 +3988,7 @@ server <- function(input, output, session) {
   })
 
 
-  # ── Plot ──
+  # \u2500\u2500 Plot \u2500\u2500
   mv_plot <- reactive({
     req(mv_pca_res(), mv_status() == "ready")
     res     <- mv_pca_res()
@@ -3850,11 +4070,11 @@ server <- function(input, output, session) {
     s <- mv_status()
     if (s == "idle") return(
       tags$div(style = "color:var(--muted); font-size:0.85rem; padding:2rem; text-align:center;",
-        tags$div(style = "font-size:2rem; margin-bottom:8px;", "🧮"),
+        tags$div(style = "font-size:2rem; margin-bottom:8px;", "\U0001f9ee"),
         tags$div("Select options and click ", tags$strong("Run analysis"), ".")))
     if (s == "error") return(
       tags$div(style = "color:#c0392b; font-size:0.85rem; padding:2rem; text-align:center;",
-        tags$div(style = "font-size:1.5rem; margin-bottom:8px;", "✕"),
+        tags$div(style = "font-size:1.5rem; margin-bottom:8px;", "\u2715"),
         tags$div("Analysis failed. See notification for details.")))
     uiOutput("mv_plot_sized")
   })
@@ -3873,7 +4093,7 @@ server <- function(input, output, session) {
             "background:rgba(196,57,43,0.08); border:1px solid rgba(196,57,43,0.3);",
             "border-radius:4px; color:#c0392b;"),
           lapply(msgs, function(m) tags$div(
-            tags$span(style="margin-right:5px;", "⚠"), m))
+            tags$span(style="margin-right:5px;", "\u26a0"), m))
         )
       else NULL
     } else NULL
