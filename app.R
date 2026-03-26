@@ -4,11 +4,8 @@ library(shinyFiles)
 library(bslib)
 library(SQMtools)
 library(DT)
-library(plotly)
 
 # ── Load COG/KEGG category files from SqueezeMeta data dir ──
-message("Loading SQMxplore data, please wait...")
-
 .find_sqm_data_file <- function(fname) {
   candidates <- c(
     file.path("/home/tamames/anaconda3/envs/SqueezeMeta-dev/SqueezeMeta/data", fname),
@@ -71,9 +68,8 @@ message("Loading SQMxplore data, please wait...")
 
 COG_CATEGORIES  <- .load_cog_categories()
 KEGG_CATEGORIES <- .load_kegg_categories()
-KEGG_L1_SHOW <- c("Cellular Processes", "Environmental Information Processing",
-                  "Genetic Information Processing", "Metabolism")
-message("Data loaded. Starting app...")
+message("COG_CATEGORIES: ", if(is.null(COG_CATEGORIES)) "NOT FOUND" else paste(nrow(COG_CATEGORIES),"rows"))
+message("KEGG_CATEGORIES: ", if(is.null(KEGG_CATEGORIES)) "NOT FOUND" else paste(nrow(KEGG_CATEGORIES),"rows"))
 
 `%||%` <- function(a, b) if (!is.null(a)) a else b
 # \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -1757,22 +1753,7 @@ ui <- page_navbar(
   title = "SQMxplore",
   theme = sqm_theme,
   navbar_options = navbar_options(theme = "dark", bg = "#0e4a82"),
-  header = tagList(
-    useShinyjs(),
-    tags$head(tags$style(HTML(custom_css))),
-    tags$div(
-      id = "app-loading-overlay",
-      style = paste0(
-        "position:fixed; top:0; left:0; width:100%; height:100%; z-index:99999;",
-        "background:rgba(247,249,252,0.97); display:flex; flex-direction:column;",
-        "align-items:center; justify-content:center; gap:12px;"),
-      tags$div(style="font-size:2rem; color:#1a6eb5;", "\u25cc"),
-      tags$div(style="font-size:1rem; font-weight:500; color:#1a2a3a;",
-               "Please wait while loading data\u2026"),
-      tags$div(style="font-size:0.8rem; color:#7a90a8;", "SQMxplore is starting up")
-    ),
-    tags$script(HTML("$(document).ready(function() { $('#app-loading-overlay').fadeOut(400); });"))
-  ),
+  header = tagList(useShinyjs(), tags$head(tags$style(HTML(custom_css)))),
   nav_panel("Project",
     layout_sidebar(fillable = FALSE,
       sidebar = sidebar(width = 300, open = TRUE,
@@ -2407,17 +2388,139 @@ server <- function(input, output, session) {
         )
       )
     } else if (pt %in% c("func_cog","func_kegg","func_pfam")) {
+      fun_label <- switch(pt,func_cog="COG",func_kegg="KEGG",func_pfam="PFAM")
+      tagList(
+        tags$div(class="sidebar-box",
+          tagList(
+            tags$div(class="form-label",paste("Search",fun_label,"functions")),
+            tags$div(class="func-search-box", tags$span(class="search-icon","\U0001f50d"),
+              textInput("func_search",NULL,placeholder=paste0("e.g. ",switch(pt,func_cog="COG0001, transport",func_kegg="K00001, ribosome",func_pfam="PF00001, kinase")))),
+            tags$div(class="func-search-hint","Comma-separated. Empty \u2192 top N functions."),
+            uiOutput("func_search_status")
+          )
+        ),
+        uiOutput("func_category_ui"),
+        tags$div(class="sidebar-box",style="margin-top:8px;",
+          tags$div(class="form-label","Count type"), uiOutput("func_count_ui"),
+          tags$div(class="form-label",style="margin-top:4px;","No. of functions"), uiOutput("n_funcs_ui")
+        ),
+        tags$div(class="sidebar-box",style="margin-top:8px;",
+          tags$div(style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--blue);margin-bottom:5px;","Format plot"),
+          tags$div(style="display:grid;grid-template-columns:1fr 1fr;gap:4px;",
+            tags$div(tags$div(class="form-label","Width (px)"),  numericInput("func_plot_width", NULL,value=800,min=200,max=3000,step=50)),
+            tags$div(tags$div(class="form-label","Height (px)"), numericInput("func_plot_height",NULL,value=560,min=200,max=3000,step=50))
+          ),
+          tags$div(class="form-label",style="margin-top:4px;","Font size"),
+          numericInput("func_base_size",NULL,value=11,min=6,max=24,step=1)
+        )
+      )
+    } else NULL
+  })
+  output$func_search_status <- renderUI({
+    pt <- input$plot_type; req(pt %in% c("func_cog","func_kegg","func_pfam")); req(sqm_data())
+    pattern <- build_func_pattern(input$func_search %||% ""); if (is.null(pattern)) return(NULL)
+    fun_level <- switch(pt,func_cog="COG",func_kegg="KEGG",func_pfam="PFAM")
+    all_ids   <- tryCatch(rownames(sqm_data()$functions[[fun_level]]$abund), error=function(e) character(0))
+    all_names <- tryCatch(sqm_data()$misc[[paste0(fun_level,"_names")]], error=function(e) character(0))
+    terms <- trimws(unlist(strsplit(input$func_search %||% "", "[,;]+")))
+    terms <- terms[nchar(terms) > 0]
+    matched <- unique(unlist(lapply(terms, function(t) {
+      by_id   <- all_ids[grepl(t, all_ids, ignore.case=TRUE)]
+      by_name <- if (length(all_names)>0) names(all_names)[grepl(t, all_names, ignore.case=TRUE)] else character(0)
+      union(by_id, by_name[by_name %in% all_ids])
+    })))
+    n <- length(matched)
+    if (n==0) tags$div(class="func-nomatch-badge","\u2715 No matches")
+    else tags$div(class="func-match-badge",paste0("\u2713 ",n," function",if(n!=1)"s" else ""))
+  })
+  output$tax_search_status <- renderUI({
+    req(input$plot_type=="taxonomy_bar"); req(sqm_data())
+    search_text <- trimws(input$tax_search %||% ""); if (nchar(search_text)==0) return(NULL)
+    rank <- input$tax_rank %||% "phylum"
+    all_taxa <- tryCatch(rownames(sqm_data()$taxa[[rank]]$abund), error=function(e) character(0))
+    terms <- trimws(unlist(strsplit(search_text,"[,;]+")));  terms <- terms[nchar(terms)>0]
+    matched <- unique(unlist(lapply(terms,function(t) all_taxa[grepl(t,all_taxa,ignore.case=TRUE)])))
+    if (length(matched)==0) tags$div(class="func-nomatch-badge","\u2715 No matches")
+    else tags$div(class="func-match-badge",paste0("\u2713 ",length(matched)," taxon",if(length(matched)!=1)"a" else ""))
+  })
+  output$n_funcs_ui   <- renderUI({ numericInput("n_funcs",NULL,value=20,min=1,max=200,step=1) })
+  output$func_count_ui <- renderUI({
+    pt <- input$plot_type; req(pt %in% c("func_cog","func_kegg","func_pfam"))
+    fun_level <- switch(pt,func_cog="COG",func_kegg="KEGG",func_pfam="PFAM")
+    counts <- if (!is.null(sqm_data())) available_func_counts(sqm_data(),fun_level) else c("Copy number"="copy_number")
+    selectInput("func_count",NULL,choices=counts,selected=if("copy_number"%in%counts)"copy_number" else counts[[1]])
+  })
+  output$sqm_plot_ui <- renderUI({
+    pt <- input$plot_type
+    is_tax  <- !is.null(pt) && pt=="taxonomy_bar"
+    is_func <- !is.null(pt) && pt %in% c("func_cog","func_kegg","func_pfam")
+    h <- if(is_tax) input$tax_plot_height %||% 560 else if(is_func) input$func_plot_height %||% 560 else 560
+    w <- if(is_tax) input$tax_plot_width  %||% 800 else if(is_func) input$func_plot_width  %||% 800 else NULL
+    style <- if(!is.null(w)) paste0("width:",w,"px; overflow-x:auto;") else "width:100%;"
+    tags$div(style=style,
+      plotOutput("sqm_plot", width=if(!is.null(w)) paste0(w,"px") else "100%", height=paste0(h,"px")))
+  })
+  plot_reactive <- reactive({
+    req(sqm_data()); proj <- sqm_data(); pt <- input$plot_type
+    req(!is.null(pt) && pt != "none")
+    # Subset samples if selection is active
+    all_smp <- tryCatch(proj$misc$samples, error=function(e) NULL)
+    sel_smp <- input$plot_samples
+    if (!is.null(all_smp) && !is.null(sel_smp) && length(sel_smp) > 0 &&
+        !setequal(sel_smp, all_smp)) {
+      proj <- tryCatch(subsetSamples(proj, sel_smp), error=function(e) proj)
+    }
+    # Filter by functional category if selected
+    if (pt == "func_cog" && !is.null(COG_CATEGORIES) &&
+        nchar(input$cog_category %||% "") > 0) {
+      keep <- COG_CATEGORIES$id[COG_CATEGORIES$category == input$cog_category]
+      for (db in names(proj$functions$COG)) {
+        m <- proj$functions$COG[[db]]
+        if (is.matrix(m) || is.data.frame(m))
+          proj$functions$COG[[db]] <- m[rownames(m) %in% keep, , drop=FALSE]
+      }
+    } else if (pt == "func_kegg" && !is.null(KEGG_CATEGORIES)) {
+      sel_l1 <- input$kegg_cat_l1 %||% ""
+      sel_l2 <- input$kegg_cat_l2 %||% ""
+      if (nchar(sel_l1) > 0) {
+        sub_cat <- KEGG_CATEGORIES[KEGG_CATEGORIES$l1 == sel_l1, ]
+        if (nchar(sel_l2) > 0)
+          sub_cat <- sub_cat[!is.na(sub_cat$l2) & sub_cat$l2 == sel_l2, ]
+        keep <- unique(sub_cat$id)
+        for (db in names(proj$functions$KEGG)) {
+          m <- proj$functions$KEGG[[db]]
+          if (is.matrix(m) || is.data.frame(m))
+            proj$functions$KEGG[[db]] <- m[rownames(m) %in% keep, , drop=FALSE]
+        }
+      }
+    }
+    if (pt=="taxonomy_bar") {
+      search_text <- if(is_sqm_full()) trimws(input$tax_search %||% "") else ""
+      if (nchar(search_text)>0) {
+        rank <- input$tax_rank %||% "phylum"
+        all_taxa <- tryCatch(rownames(proj$taxa[[rank]]$abund),error=function(e) character(0))
+        terms <- trimws(unlist(strsplit(search_text,"[,;]+")));  terms <- terms[nchar(terms)>0]
+        matched <- unique(unlist(lapply(terms,function(t) all_taxa[grepl(t,all_taxa,ignore.case=TRUE)])))
+        if (length(matched)==0) { showNotification(paste0("No taxa found matching: \"",search_text,"\""),type="warning",duration=5); return(NULL) }
+        proj_sub <- tryCatch(subsetTax(proj,rank=rank,tax=matched),error=function(e) NULL)
+        if (is.null(proj_sub)) { showNotification("subsetTax failed.",type="error",duration=5); return(NULL) }
+        plotTaxonomy(proj_sub,rank=rank,count=input$tax_count,N=input$n_taxa,base_size=input$tax_base_size %||% 11,
+          ignore_unmapped=isTRUE(input$tax_ignore_unmapped),ignore_unclassified=isTRUE(input$tax_ignore_unclassified),
+          no_partial_classifications=isTRUE(input$tax_no_partial_classifications),rescale=isTRUE(input$tax_rescale),
+          max_scale_value=if(is.na(input$tax_max_scale_value)) NULL else input$tax_max_scale_value)
+      } else {
+        plotTaxonomy(proj,rank=input$tax_rank %||% "phylum",count=input$tax_count,N=input$n_taxa,base_size=input$tax_base_size %||% 11,
+          ignore_unmapped=isTRUE(input$tax_ignore_unmapped),ignore_unclassified=isTRUE(input$tax_ignore_unclassified),
+          no_partial_classifications=isTRUE(input$tax_no_partial_classifications),rescale=isTRUE(input$tax_rescale),
+          max_scale_value=if(is.na(input$tax_max_scale_value)) NULL else input$tax_max_scale_value)
+      }
+    } else if (pt %in% c("func_cog","func_kegg","func_pfam")) {
       fun_level <- switch(pt,func_cog="COG",func_kegg="KEGG",func_pfam="PFAM")
       req(nchar(input$func_count %||% "") > 0)
       req(!is.null(input$n_funcs))
-      cnt   <- input$func_count
-      n_top <- input$n_funcs
-      mat   <- tryCatch(as.matrix(proj$functions[[fun_level]][[cnt]]), error=function(e) NULL)
-      req(!is.null(mat) && nrow(mat) > 0)
-      # Search filter
       search_text <- trimws(input$func_search %||% "")
       if (nchar(search_text) > 0) {
-        all_ids   <- rownames(mat)
+        all_ids   <- tryCatch(rownames(proj$functions[[fun_level]]$abund), error=function(e) character(0))
         all_names <- tryCatch(proj$misc[[paste0(fun_level,"_names")]], error=function(e) character(0))
         terms <- trimws(unlist(strsplit(search_text, "[,;]+")))
         terms <- terms[nchar(terms) > 0]
@@ -2428,71 +2531,22 @@ server <- function(input, output, session) {
         })))
         if (length(matched)==0) {
           showNotification(paste0("No ",fun_level," functions found matching: \"",search_text,"\""),
-                           type="warning", duration=5); return(NULL)
+                           type="warning", duration=5)
+          return(NULL)
         }
-        mat <- mat[rownames(mat) %in% matched, , drop=FALSE]
+        fun_sub <- lapply(proj$functions[[fun_level]], function(m) {
+          if (is.matrix(m) || is.data.frame(m)) m[rownames(m) %in% matched, , drop=FALSE] else m
+        })
+        proj_plot <- proj
+        proj_plot$functions[[fun_level]] <- fun_sub
+        plotFunctions(proj_plot, fun_level=fun_level, count=input$func_count,
+                      N=input$n_funcs, base_size=input$func_base_size %||% 11)
+      } else {
+        plotFunctions(proj, fun_level=fun_level, count=input$func_count,
+                      N=input$n_funcs, base_size=input$func_base_size %||% 11)
       }
-      # Select top N by row mean
-      if (nrow(mat) > n_top) {
-        top_idx <- order(rowMeans(mat, na.rm=TRUE), decreasing=TRUE)[seq_len(n_top)]
-        mat <- mat[top_idx, , drop=FALSE]
-      }
-      mat  # return matrix — plotly render handles the rest
     } else if (pt=="bins") { plotBins(proj) }
   })
-  output$sqm_func_plot <- renderPlotly({
-    pt <- input$plot_type
-    req(pt %in% c("func_cog","func_kegg","func_pfam"))
-    mat <- plot_reactive()
-    req(is.matrix(mat) && nrow(mat) > 0)
-    fun_level <- switch(pt,func_cog="COG",func_kegg="KEGG",func_pfam="PFAM")
-    proj <- sqm_data()
-    # Get function names for row labels
-    all_names <- tryCatch(proj$misc[[paste0(fun_level,"_names")]], error=function(e) NULL)
-    row_labels <- if (!is.null(all_names)) {
-      nms <- all_names[rownames(mat)]
-      ifelse(is.na(nms) | nms=="", rownames(mat), paste0(rownames(mat)," - ",nms))
-    } else rownames(mat)
-    # Log scale
-    display_mat <- if (isTRUE(input$func_log_scale)) log10(mat + 0.001) else mat
-    # Cluster rows
-    if (isTRUE(input$func_cluster_rows) && nrow(display_mat) > 2) {
-      ord <- tryCatch(hclust(dist(display_mat))$order, error=function(e) seq_len(nrow(display_mat)))
-      display_mat <- display_mat[ord, , drop=FALSE]
-      row_labels  <- row_labels[ord]
-    }
-    # Color palette
-    pal <- input$func_palette %||% "YlOrRd"
-    colorscale <- switch(pal,
-      "viridis" = "Viridis",
-      "RdBu"    = "RdBu",
-      pal)
-    cnt_label <- c(abund="Raw abundance",percent="Percentage",bases="Bases",
-                   cpm="CPM",tpm="TPM",copy_number="Copy number")[input$func_count]
-    cnt_label <- if(is.na(cnt_label)) input$func_count else cnt_label
-    if (isTRUE(input$func_log_scale)) cnt_label <- paste0("log10(",cnt_label,")")
-    plot_ly(
-      x = colnames(display_mat),
-      y = row_labels,
-      z = display_mat,
-      type = "heatmap",
-      colorscale = colorscale,
-      reversescale = pal %in% c("Blues","Greens","Purples"),
-      hovertemplate = paste0(
-        "<b>%{y}</b><br>",
-        "Sample: %{x}<br>",
-        cnt_label, ": %{z:.4g}<extra></extra>"),
-      colorbar = list(title=cnt_label)
-    ) |> layout(
-      margin = list(l=200, b=80, r=20, t=30),
-      xaxis  = list(tickangle=-45, title=""),
-      yaxis  = list(title="", autorange="reversed"),
-      paper_bgcolor = "white",
-      plot_bgcolor  = "white"
-    ) |> config(displayModeBar=TRUE, displaylogo=FALSE,
-                modeBarButtonsToRemove=list("lasso2d","select2d"))
-  })
-
   output$sqm_plot <- renderPlot({ plot_reactive() }, bg="#ffffff")
   output$plot_status_badge <- renderUI({
     if (is.null(sqm_data())) tags$span(class="badge",style="background:#eef2f7;color:#7a90a8;font-size:0.72rem;border:1px solid #d0dae6;","No project")
@@ -2890,9 +2944,7 @@ server <- function(input, output, session) {
     req(pt %in% c("func_cog","func_kegg","func_pfam"))
 
     if (pt == "func_cog" && !is.null(COG_CATEGORIES)) {
-      cats <- sort(setdiff(
-        unique(COG_CATEGORIES$category),
-        c("Function unknown", "General function prediction only")))
+      cats <- sort(unique(COG_CATEGORIES$category))
       tags$div(class="sidebar-box", style="margin-top:8px;",
         tags$div(class="form-label", "COG category"),
         selectInput("cog_category", NULL,
@@ -2905,9 +2957,7 @@ server <- function(input, output, session) {
       sel_l2 <- isolate(input$kegg_cat_l2 %||% "")
 
       # Build collapsible tree from KEGG_CATEGORIES l1/l2
-      l1_vals <- sort(intersect(
-        unique(KEGG_CATEGORIES$l1[!is.na(KEGG_CATEGORIES$l1)]),
-        KEGG_L1_SHOW))
+      l1_vals <- sort(unique(KEGG_CATEGORIES$l1[!is.na(KEGG_CATEGORIES$l1)]))
 
       tree_items <- lapply(l1_vals, function(l1) {
         l2_vals <- sort(unique(KEGG_CATEGORIES$l2[
