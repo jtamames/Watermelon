@@ -1928,12 +1928,6 @@ server <- function(input, output, session) {
     s <- status()
     col <- switch(s, idle="#7a90a8", loading="#3b9ede", ready="#1a9e6e", error="#c0392b")
     ico <- switch(s, idle="○", loading="◌", ready="●", error="✕")
-    if (s == "loading") return(
-      tags$div(
-        style = paste0("display:flex; align-items:center; gap:8px;",
-                       "padding:0.6rem 0; color:#3b9ede; font-size:0.88rem;"),
-        tags$span(style="font-size:1.2rem; animation:spin 1s linear infinite;", "◌"),
-        tags$span("Loading project, please wait…")))
     tags$div(style="font-size:0.8rem;",
       tags$span(style=paste0("color:",col,"; margin-right:5px;"), ico),
       tags$span(style="color:#7a90a8;", "Status: "),
@@ -1972,6 +1966,16 @@ server <- function(input, output, session) {
   sqm_section <- function(title, ...) tags$div(class="sqm-section",
     tags$div(class="sqm-section-header",title), tags$div(class="sqm-section-body",...))
   output$project_summary_ui <- renderUI({
+    s <- status()
+    if (s == "loading") return(
+      tags$div(
+        style = paste0("display:flex; align-items:center; gap:12px;",
+                       "padding:3rem 2rem; color:#3b9ede; font-size:0.95rem;"),
+        tags$span(style="font-size:2rem;", "◌"),
+        tags$div(
+          tags$div(style="font-weight:600;", "Loading project, please wait…"),
+          tags$div(style="font-size:0.8rem; color:var(--muted); margin-top:4px;",
+                   "This may take a moment for large projects."))))
     proj <- sqm_data()
     if (is.null(proj)) return(tags$div(style="color:var(--muted);font-size:0.85rem;padding:1rem;","No project loaded yet."))
 
@@ -2502,7 +2506,7 @@ server <- function(input, output, session) {
 
     # Build stacked bar chart (one bar per sample, stacked by taxon)
     samples <- colnames(mat)
-    p <- plot_ly()
+    p <- plot_ly(width=pw, height=ph)
     for (i in seq_len(nrow(mat))) {
       p <- add_trace(p,
         x    = samples,
@@ -2515,8 +2519,6 @@ server <- function(input, output, session) {
     }
     p <- layout(p,
       barmode = "stack",
-      width   = pw,
-      height  = ph,
       xaxis   = list(title="", tickfont=list(size=fs), tickangle=-35),
       yaxis   = list(title=count, tickfont=list(size=fs), titlefont=list(size=fs)),
       legend  = list(font=list(size=max(fs-2,8)), traceorder="normal"),
@@ -2652,13 +2654,13 @@ server <- function(input, output, session) {
       type      = "heatmap",
       colorscale = input$func_palette %||% "Blues",
       reversescale = FALSE,
-      hovertemplate = "<b>%{y}</b><br>Sample: %{x}<br>Value: %{z}<extra></extra>"
+      hovertemplate = "<b>%{y}</b><br>Sample: %{x}<br>Value: %{z}<extra></extra>",
+      width     = pw,
+      height    = ph
     )
     pw <- input$func_plot_width  %||% 1200
     ph <- input$func_plot_height %||% 560
     p <- layout(p,
-      width  = pw,
-      height = ph,
       xaxis  = list(title="", tickfont=list(size=fs), tickangle=-45, automargin=TRUE),
       yaxis  = list(title="", tickfont=list(size=fs), automargin=TRUE, autorange="reversed"),
       margin = list(l=10, r=10, t=30, b=60),
