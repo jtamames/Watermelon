@@ -2234,13 +2234,17 @@ server <- function(input, output, session) {
         tags$div(class="sidebar-box",style="margin-top:8px;",
           tags$div(style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--blue);margin-bottom:5px;","Format plot"),
           tags$div(style="display:grid;grid-template-columns:1fr 1fr;gap:4px;",
-            tags$div(tags$div(class="form-label","Width (px)"),  numericInput("tax_plot_width", NULL,value=800,min=200,max=3000,step=50)),
+            tags$div(tags$div(class="form-label","Width (px)"),  numericInput("tax_plot_width", NULL,value=1200,min=400,max=4000,step=50)),
             tags$div(tags$div(class="form-label","Height (px)"), numericInput("tax_plot_height",NULL,value=560,min=200,max=3000,step=50))
           ),
-          tags$div(class="form-label",style="margin-top:4px;","Max scale value"),
-          numericInput("tax_max_scale_value",NULL,value=NA,min=0,step=1),
           tags$div(class="form-label",style="margin-top:4px;","Font size"),
-          numericInput("tax_base_size",NULL,value=11,min=6,max=24,step=1)
+          numericInput("tax_font_size",NULL,value=11,min=6,max=24,step=1),
+          tags$div(class="form-label",style="margin-top:4px;","Colour palette"),
+          selectInput("tax_palette", NULL,
+            choices = c("Blues","Viridis","YlOrRd","RdBu","Greens","Set2","Pastel1","Paired"),
+            selected = "Blues"),
+          tags$div(class="form-label",style="margin-top:4px;","Label width (chars)"),
+          numericInput("tax_label_width", NULL, value=30, min=5, max=100, step=5)
         )
       )
     } else if (pt %in% c("func_cog","func_kegg","func_pfam")) {
@@ -2321,6 +2325,9 @@ server <- function(input, output, session) {
     if (is_func) {
       tags$div(style="width:100%; overflow-x:auto;",
         plotlyOutput("sqm_func_plot", width="100%", height=paste0(h,"px")))
+    } else if (is_tax) {
+      tags$div(style="width:100%; overflow-x:auto;",
+        plotlyOutput("sqm_tax_plot", width="100%", height=paste0(h,"px")))
     } else {
       tags$div(style=style,
         plotOutput("sqm_plot", width=if(!is.null(w)) paste0(w,"px") else "100%", height=paste0(h,"px")))
@@ -2361,30 +2368,126 @@ server <- function(input, output, session) {
       }
     }
     if (pt=="taxonomy_bar") {
-      search_text <- if(is_sqm_full()) trimws(input$tax_search %||% "") else ""
-      if (nchar(search_text)>0) {
-        rank <- input$tax_rank %||% "phylum"
-        all_taxa <- tryCatch(rownames(proj$taxa[[rank]]$abund),error=function(e) character(0))
-        terms <- trimws(unlist(strsplit(search_text,"[,;]+")));  terms <- terms[nchar(terms)>0]
-        matched <- unique(unlist(lapply(terms,function(t) all_taxa[grepl(t,all_taxa,ignore.case=TRUE)])))
-        if (length(matched)==0) { showNotification(paste0("No taxa found matching: \"",search_text,"\""),type="warning",duration=5); return(NULL) }
-        proj_sub <- tryCatch(subsetTax(proj,rank=rank,tax=matched),error=function(e) NULL)
-        if (is.null(proj_sub)) { showNotification("subsetTax failed.",type="error",duration=5); return(NULL) }
-        plotTaxonomy(proj_sub,rank=rank,count=input$tax_count,N=input$n_taxa,base_size=input$tax_base_size %||% 11,
-          ignore_unmapped=isTRUE(input$tax_ignore_unmapped),ignore_unclassified=isTRUE(input$tax_ignore_unclassified),
-          no_partial_classifications=isTRUE(input$tax_no_partial_classifications),rescale=isTRUE(input$tax_rescale),
-          max_scale_value=if(is.na(input$tax_max_scale_value)) NULL else input$tax_max_scale_value)
-      } else {
-        plotTaxonomy(proj,rank=input$tax_rank %||% "phylum",count=input$tax_count,N=input$n_taxa,base_size=input$tax_base_size %||% 11,
-          ignore_unmapped=isTRUE(input$tax_ignore_unmapped),ignore_unclassified=isTRUE(input$tax_ignore_unclassified),
-          no_partial_classifications=isTRUE(input$tax_no_partial_classifications),rescale=isTRUE(input$tax_rescale),
-          max_scale_value=if(is.na(input$tax_max_scale_value)) NULL else input$tax_max_scale_value)
-      }
+      return(NULL)  # handled by tax_plot_reactive / sqm_tax_plot
     } else if (pt %in% c("func_cog","func_kegg","func_pfam")) {
       return(NULL)  # handled by func_plot_reactive / sqm_func_plot
     } else if (pt=="bins") { plotBins(proj) }
   })
   output$sqm_plot <- renderPlot({ plot_reactive() }, bg="#ffffff")
+
+  # ── Plotly reactive for taxonomy plots ──────────────────────────────────────
+  tax_plot_reactive <- reactive({
+    req(sqm_data()); proj <- sqm_data(); pt <- input$plot_type
+    req(pt == "taxonomy_bar")
+    rank <- input$tax_rank %||% "phylum"
+    fs   <- input$tax_font_size %||% 11
+    lw   <- input$tax_label_width %||% 30
+    pal  <- input$tax_palette %||% "Blues"
+    pw   <- input$tax_plot_width  %||% 1200
+    ph   <- input$tax_plot_height %||% 560
+
+    # Subset samples
+    all_smp <- tryCatch(proj$misc$samples, error=function(e) NULL)
+    sel_smp <- input$plot_samples
+    if (!is.null(all_smp) && !is.null(sel_smp) && length(sel_smp) > 0 &&
+        !setequal(sel_smp, all_smp))
+      proj <- tryCatch(subsetSamples(proj, sel_smp), error=function(e) proj)
+
+    # Search filter
+    search_text <- if(is_sqm_full()) trimws(input$tax_search %||% "") else ""
+    if (nchar(search_text) > 0) {
+      all_taxa <- tryCatch(rownames(proj$taxa[[rank]]$abund), error=function(e) character(0))
+      terms    <- trimws(unlist(strsplit(search_text, "[,;]+")))
+      terms    <- terms[nchar(terms) > 0]
+      matched  <- unique(unlist(lapply(terms, function(t)
+        all_taxa[grepl(t, all_taxa, ignore.case=TRUE)])))
+      if (length(matched) == 0) {
+        showNotification(paste0("No taxa found matching: \"", search_text, "\""),
+                         type="warning", duration=5)
+        return(NULL)
+      }
+      proj <- tryCatch(subsetTax(proj, rank=rank, tax=matched), error=function(e) proj)
+    }
+
+    # Get abundance matrix
+    count  <- input$tax_count %||% "percent"
+    mat    <- tryCatch(proj$taxa[[rank]][[count]], error=function(e) NULL)
+    req(!is.null(mat) && (is.matrix(mat) || is.data.frame(mat)) && nrow(mat) > 0)
+    mat    <- as.matrix(mat)
+
+    # Filter options
+    if (isTRUE(input$tax_ignore_unmapped))
+      mat <- mat[!grepl("^[Uu]nmapped$|^[Nn]o [Hh]it", rownames(mat)), , drop=FALSE]
+    if (isTRUE(input$tax_ignore_unclassified))
+      mat <- mat[!grepl("^[Uu]nclassified", rownames(mat)), , drop=FALSE]
+    req(nrow(mat) > 0)
+
+    # Top N
+    n_taxa <- min(input$n_taxa %||% 15, nrow(mat))
+    top_idx <- order(rowSums(mat, na.rm=TRUE), decreasing=TRUE)[seq_len(n_taxa)]
+    mat <- mat[top_idx, , drop=FALSE]
+
+    # Wrap labels
+    wrap_label <- function(s) {
+      if (nchar(s) <= lw) return(s)
+      words <- strsplit(s, " ")[[1]]
+      lines <- ""; cur <- ""
+      for (w in words) {
+        if (nchar(cur) == 0) { cur <- w
+        } else if (nchar(cur) + 1 + nchar(w) <= lw) { cur <- paste(cur, w)
+        } else { lines <- if(nchar(lines)==0) cur else paste0(lines,"<br>",cur); cur <- w }
+      }
+      if (nchar(cur)>0) lines <- if(nchar(lines)==0) cur else paste0(lines,"<br>",cur)
+      lines
+    }
+    taxa_labels <- sapply(rownames(mat), wrap_label, USE.NAMES=FALSE)
+
+    # Colour palette
+    n_taxa_show <- nrow(mat)
+    colours <- if (pal %in% c("Set2","Pastel1","Paired")) {
+      grDevices::palette.colors(n=max(n_taxa_show, 3), palette=pal)[seq_len(n_taxa_show)]
+    } else {
+      colorRampPalette(switch(pal,
+        Blues    = c("#deebf7","#084594"),
+        Viridis  = c("#440154","#31688e","#35b779","#fde725"),
+        YlOrRd   = c("#ffffb2","#fd8d3c","#bd0026"),
+        RdBu     = c("#2166ac","#f7f7f7","#d6604d"),
+        Greens   = c("#e5f5e0","#006d2c"),
+        Hot      = c("#ffffff","#ff6600","#cc0000"),
+        Portland = c("#0c3383","#2182bd","#94bfe1","#fbefcc","#e28f67","#b1513d","#6f0d0d"),
+        Jet      = c("#00007f","#0000ff","#007fff","#00ffff","#7fff7f","#ffff00","#ff7f00","#ff0000","#7f0000"),
+        c("#deebf7","#084594")
+      ))(n_taxa_show)
+    }
+
+    # Build stacked bar chart (one bar per sample, stacked by taxon)
+    samples <- colnames(mat)
+    p <- plot_ly()
+    for (i in seq_len(nrow(mat))) {
+      p <- add_trace(p,
+        x    = samples,
+        y    = mat[i, ],
+        type = "bar",
+        name = taxa_labels[i],
+        marker = list(color = colours[i]),
+        hovertemplate = paste0("<b>", taxa_labels[i], "</b><br>%{x}: %{y:.4f}<extra></extra>")
+      )
+    }
+    p <- layout(p,
+      barmode = "stack",
+      width   = pw,
+      height  = ph,
+      xaxis   = list(title="", tickfont=list(size=fs), tickangle=-35),
+      yaxis   = list(title=count, tickfont=list(size=fs), titlefont=list(size=fs)),
+      legend  = list(font=list(size=max(fs-2,8)), traceorder="normal"),
+      margin  = list(l=10, r=10, t=30, b=60),
+      paper_bgcolor = "rgba(0,0,0,0)",
+      plot_bgcolor  = "rgba(0,0,0,0)"
+    )
+    config(p, displayModeBar=FALSE)
+  })
+
+  output$sqm_tax_plot <- renderPlotly({ tax_plot_reactive() })
 
   # ── Plotly reactive for function plots ──────────────────────────────────────
   func_plot_reactive <- reactive({
@@ -2539,7 +2642,11 @@ server <- function(input, output, session) {
       is_func <- !is.null(pt) && pt %in% c("func_cog","func_kegg","func_pfam")
       w <- if(is_tax) isolate(input$tax_plot_width  %||% 800) else if(is_func) isolate(input$func_plot_width  %||% 800) else 1400
       h <- if(is_tax) isolate(input$tax_plot_height %||% 560) else if(is_func) isolate(input$func_plot_height %||% 560) else 900
+      if (is_tax) {
+      showNotification("Use the Plotly camera button to save taxonomy plots.", type="message", duration=5)
+    } else {
       png(file,width=w,height=h,res=150,bg="#ffffff"); print(plot_reactive()); dev.off()
+    }
     }
   )
   output$table_sample_filter <- renderUI({
