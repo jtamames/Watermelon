@@ -1916,19 +1916,24 @@ server <- function(input, output, session) {
       showNotification("Directory not available. Please select it manually.", type = "error", duration = 8); return()
     }
     status("loading")
-    tryCatch({
-      is_sqm <- grepl("SqueezeMeta", creator_name() %||% "", ignore.case = TRUE)
-      proj <- if (is_sqm) loadSQM(tp) else loadSQMlite(tp)
-      sqm_data(proj); is_sqm_full(is_sqm); status("ready")
-
-
-
-    }, error = function(e) { status("error"); showNotification(paste("Error:", e$message), type = "error", duration = 8) })
+    shinyjs::delay(50, {
+      tryCatch({
+        is_sqm <- grepl("SqueezeMeta", creator_name() %||% "", ignore.case = TRUE)
+        proj <- if (is_sqm) loadSQM(tp) else loadSQMlite(tp)
+        sqm_data(proj); is_sqm_full(is_sqm); status("ready")
+      }, error = function(e) { status("error"); showNotification(paste("Error:", e$message), type = "error", duration = 8) })
+    })
   })
   output$project_status_ui <- renderUI({
     s <- status()
     col <- switch(s, idle="#7a90a8", loading="#3b9ede", ready="#1a9e6e", error="#c0392b")
-    ico <- switch(s, idle="\u25cb", loading="\u25cc", ready="\u25cf", error="\u2715")
+    ico <- switch(s, idle="○", loading="◌", ready="●", error="✕")
+    if (s == "loading") return(
+      tags$div(
+        style = paste0("display:flex; align-items:center; gap:8px;",
+                       "padding:0.6rem 0; color:#3b9ede; font-size:0.88rem;"),
+        tags$span(style="font-size:1.2rem; animation:spin 1s linear infinite;", "◌"),
+        tags$span("Loading project, please wait…")))
     tags$div(style="font-size:0.8rem;",
       tags$span(style=paste0("color:",col,"; margin-right:5px;"), ico),
       tags$span(style="color:#7a90a8;", "Status: "),
@@ -2227,7 +2232,7 @@ server <- function(input, output, session) {
           tags$div(style="display:grid;grid-template-columns:1fr 1fr;gap:0;",
             checkboxInput("tax_ignore_unmapped","Ignore unmapped",value=FALSE),
             checkboxInput("tax_ignore_unclassified","Ignore unclassified",value=FALSE),
-            checkboxInput("tax_no_partial_classifications","No ambiguous taxa",value=FALSE),
+            checkboxInput("tax_no_partial_classifications","Ignore ambiguous",value=FALSE),
             checkboxInput("tax_rescale","Rescale",value=FALSE)
           )
         ),
