@@ -2646,6 +2646,9 @@ server <- function(input, output, session) {
     # Order rows by total (top at top of heatmap)
     mat <- mat[order(rowSums(mat, na.rm=TRUE), decreasing=TRUE), , drop=FALSE]
 
+    pw <- input$func_plot_width  %||% 1200
+    ph <- input$func_plot_height %||% 560
+
     # Build plotly heatmap with Blues colorscale
     p <- plot_ly(
       z         = mat,
@@ -2658,8 +2661,6 @@ server <- function(input, output, session) {
       width     = pw,
       height    = ph
     )
-    pw <- input$func_plot_width  %||% 1200
-    ph <- input$func_plot_height %||% 560
     p <- layout(p,
       xaxis  = list(title="", tickfont=list(size=fs), tickangle=-45, automargin=TRUE),
       yaxis  = list(title="", tickfont=list(size=fs), automargin=TRUE, autorange="reversed"),
