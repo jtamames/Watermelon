@@ -4,8 +4,9 @@ library(shinyFiles)
 library(bslib)
 library(SQMtools)
 library(DT)
+library(plotly)
 
-# ── Load COG/KEGG category files from SqueezeMeta data dir ──
+# \u2500\u2500 Load COG/KEGG category files from SqueezeMeta data dir \u2500\u2500
 .find_sqm_data_file <- function(fname) {
   candidates <- c(
     file.path("/home/tamames/anaconda3/envs/SqueezeMeta-dev/SqueezeMeta/data", fname),
@@ -1620,7 +1621,13 @@ ui <- page_navbar(
         tags$div(style = "margin-top:5px;",
           downloadButton("download_table", "Download CSV", class = "btn-outline-secondary w-100"))
       ),
-      card(card_header("Data"), card_body(class = "p-2", DTOutput("data_table")))
+      card(card_header("Data"), card_body(class = "p-2",
+        tags$div(id = "tbl_loading_banner",
+          style = paste0("display:none; align-items:center; gap:10px; padding:1.5rem;",
+                         "color:#1a6eb5; font-size:0.88rem;"),
+          tags$span(style="font-size:1.4rem;", "⌛"),
+          tags$span("Loading results, please wait…")),
+        DTOutput("data_table")))
     )
   ),
   nav_panel("Krona",
@@ -1784,7 +1791,7 @@ server <- function(input, output, session) {
   # \u2500\u2500 active_table: a reactiveVal updated by each selector.
   #    assembly/taxonomy/functions use ignoreInit=TRUE (multi-option selectors).
   #    bins uses a dedicated actionButton to avoid the single-option problem.
-  active_tbl_rv <- reactiveVal("none")
+  active_tbl_rv  <- reactiveVal("none")
 
   observeEvent(input$tbl_assembly,  ignoreNULL=TRUE, ignoreInit=TRUE,
     { active_tbl_rv(input$tbl_assembly) })
@@ -2223,16 +2230,20 @@ server <- function(input, output, session) {
         uiOutput("func_category_ui"),
         tags$div(class="sidebar-box",style="margin-top:8px;",
           tags$div(class="form-label","Count type"), uiOutput("func_count_ui"),
-          tags$div(class="form-label",style="margin-top:4px;","No. of functions"), uiOutput("n_funcs_ui")
+          tags$div(class="form-label",style="margin-top:4px;","No. of functions"), numericInput("n_funcs", NULL, value=20, min=1, max=500, step=1)
         ),
         tags$div(class="sidebar-box",style="margin-top:8px;",
           tags$div(style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--blue);margin-bottom:5px;","Format plot"),
           tags$div(style="display:grid;grid-template-columns:1fr 1fr;gap:4px;",
-            tags$div(tags$div(class="form-label","Width (px)"),  numericInput("func_plot_width", NULL,value=800,min=200,max=3000,step=50)),
+            tags$div(tags$div(class="form-label","Width (px)"),  numericInput("func_plot_width", NULL,value=1200,min=400,max=4000,step=50)),
             tags$div(tags$div(class="form-label","Height (px)"), numericInput("func_plot_height",NULL,value=560,min=200,max=3000,step=50))
           ),
           tags$div(class="form-label",style="margin-top:4px;","Font size"),
-          numericInput("func_base_size",NULL,value=11,min=6,max=24,step=1)
+          numericInput("func_font_size",NULL,value=11,min=6,max=24,step=1),
+          tags$div(class="form-label",style="margin-top:4px;","Colour palette"),
+          selectInput("func_palette", NULL,
+            choices = c("Blues","Viridis","YlOrRd","RdBu","Greens","Hot","Portland","Jet"),
+            selected = "Blues")
         )
       )
     } else NULL
@@ -2264,7 +2275,6 @@ server <- function(input, output, session) {
     if (length(matched)==0) tags$div(class="func-nomatch-badge","\u2715 No matches")
     else tags$div(class="func-match-badge",paste0("\u2713 ",length(matched)," taxon",if(length(matched)!=1)"a" else ""))
   })
-  output$n_funcs_ui   <- renderUI({ numericInput("n_funcs",NULL,value=20,min=1,max=200,step=1) })
   output$func_count_ui <- renderUI({
     pt <- input$plot_type; req(pt %in% c("func_cog","func_kegg","func_pfam"))
     fun_level <- switch(pt,func_cog="COG",func_kegg="KEGG",func_pfam="PFAM")
@@ -2278,8 +2288,13 @@ server <- function(input, output, session) {
     h <- if(is_tax) input$tax_plot_height %||% 560 else if(is_func) input$func_plot_height %||% 560 else 560
     w <- if(is_tax) input$tax_plot_width  %||% 800 else if(is_func) input$func_plot_width  %||% 800 else NULL
     style <- if(!is.null(w)) paste0("width:",w,"px; overflow-x:auto;") else "width:100%;"
-    tags$div(style=style,
-      plotOutput("sqm_plot", width=if(!is.null(w)) paste0(w,"px") else "100%", height=paste0(h,"px")))
+    if (is_func) {
+      tags$div(style="width:100%; overflow-x:auto;",
+        plotlyOutput("sqm_func_plot", width="100%", height=paste0(h,"px")))
+    } else {
+      tags$div(style=style,
+        plotOutput("sqm_plot", width=if(!is.null(w)) paste0(w,"px") else "100%", height=paste0(h,"px")))
+    }
   })
   plot_reactive <- reactive({
     req(sqm_data()); proj <- sqm_data(); pt <- input$plot_type
@@ -2336,39 +2351,131 @@ server <- function(input, output, session) {
           max_scale_value=if(is.na(input$tax_max_scale_value)) NULL else input$tax_max_scale_value)
       }
     } else if (pt %in% c("func_cog","func_kegg","func_pfam")) {
-      fun_level <- switch(pt,func_cog="COG",func_kegg="KEGG",func_pfam="PFAM")
-      req(nchar(input$func_count %||% "") > 0)
-      req(!is.null(input$n_funcs))
-      search_text <- trimws(input$func_search %||% "")
-      if (nchar(search_text) > 0) {
-        all_ids   <- tryCatch(rownames(proj$functions[[fun_level]]$abund), error=function(e) character(0))
-        all_names <- tryCatch(proj$misc[[paste0(fun_level,"_names")]], error=function(e) character(0))
-        terms <- trimws(unlist(strsplit(search_text, "[,;]+")))
-        terms <- terms[nchar(terms) > 0]
-        matched <- unique(unlist(lapply(terms, function(t) {
-          by_id   <- all_ids[grepl(t, all_ids, ignore.case=TRUE)]
-          by_name <- if (length(all_names)>0) names(all_names)[grepl(t, all_names, ignore.case=TRUE)] else character(0)
-          union(by_id, by_name[by_name %in% all_ids])
-        })))
-        if (length(matched)==0) {
-          showNotification(paste0("No ",fun_level," functions found matching: \"",search_text,"\""),
-                           type="warning", duration=5)
-          return(NULL)
-        }
-        fun_sub <- lapply(proj$functions[[fun_level]], function(m) {
-          if (is.matrix(m) || is.data.frame(m)) m[rownames(m) %in% matched, , drop=FALSE] else m
-        })
-        proj_plot <- proj
-        proj_plot$functions[[fun_level]] <- fun_sub
-        plotFunctions(proj_plot, fun_level=fun_level, count=input$func_count,
-                      N=input$n_funcs, base_size=input$func_base_size %||% 11)
-      } else {
-        plotFunctions(proj, fun_level=fun_level, count=input$func_count,
-                      N=input$n_funcs, base_size=input$func_base_size %||% 11)
-      }
+      return(NULL)  # handled by func_plot_reactive / sqm_func_plot
     } else if (pt=="bins") { plotBins(proj) }
   })
   output$sqm_plot <- renderPlot({ plot_reactive() }, bg="#ffffff")
+
+  # ── Plotly reactive for function plots ──────────────────────────────────────
+  func_plot_reactive <- reactive({
+    req(sqm_data()); proj <- sqm_data(); pt <- input$plot_type
+    req(pt %in% c("func_cog","func_kegg","func_pfam"))
+    fun_level <- switch(pt, func_cog="COG", func_kegg="KEGG", func_pfam="PFAM")
+    req(nchar(input$func_count %||% "") > 0)
+    req(!is.null(input$n_funcs))
+    fs <- input$func_font_size %||% 11
+
+    # Subset samples
+    all_smp <- tryCatch(proj$misc$samples, error=function(e) NULL)
+    sel_smp <- input$plot_samples
+    if (!is.null(all_smp) && !is.null(sel_smp) && length(sel_smp) > 0 &&
+        !setequal(sel_smp, all_smp)) {
+      proj <- tryCatch(subsetSamples(proj, sel_smp), error=function(e) proj)
+    }
+
+    # Category filter (COG / KEGG)
+    if (pt == "func_cog" && !is.null(COG_CATEGORIES) &&
+        nchar(input$cog_category %||% "") > 0) {
+      keep <- COG_CATEGORIES$id[COG_CATEGORIES$category == input$cog_category]
+      for (db in names(proj$functions$COG)) {
+        m <- proj$functions$COG[[db]]
+        if (is.matrix(m) || is.data.frame(m))
+          proj$functions$COG[[db]] <- m[rownames(m) %in% keep, , drop=FALSE]
+      }
+    } else if (pt == "func_kegg" && !is.null(KEGG_CATEGORIES)) {
+      sel_l1 <- input$kegg_cat_l1 %||% ""
+      sel_l2 <- input$kegg_cat_l2 %||% ""
+      if (nchar(sel_l1) > 0) {
+        sub_cat <- KEGG_CATEGORIES[KEGG_CATEGORIES$l1 == sel_l1, ]
+        if (nchar(sel_l2) > 0)
+          sub_cat <- sub_cat[!is.na(sub_cat$l2) & sub_cat$l2 == sel_l2, ]
+        keep <- unique(sub_cat$id)
+        for (db in names(proj$functions$KEGG)) {
+          m <- proj$functions$KEGG[[db]]
+          if (is.matrix(m) || is.data.frame(m))
+            proj$functions$KEGG[[db]] <- m[rownames(m) %in% keep, , drop=FALSE]
+        }
+      }
+    }
+
+    # Search filter
+    search_text <- trimws(input$func_search %||% "")
+    if (nchar(search_text) > 0) {
+      all_ids   <- tryCatch(rownames(proj$functions[[fun_level]]$abund), error=function(e) character(0))
+      all_names <- tryCatch(proj$misc[[paste0(fun_level,"_names")]], error=function(e) character(0))
+      terms <- trimws(unlist(strsplit(search_text, "[,;]+")))
+      terms <- terms[nchar(terms) > 0]
+      matched <- unique(unlist(lapply(terms, function(t) {
+        by_id   <- all_ids[grepl(t, all_ids, ignore.case=TRUE)]
+        by_name <- if (length(all_names)>0) names(all_names)[grepl(t, all_names, ignore.case=TRUE)] else character(0)
+        union(by_id, by_name[by_name %in% all_ids])
+      })))
+      if (length(matched)==0) {
+        showNotification(paste0("No ",fun_level," functions found matching: \"",search_text,"\""),
+                         type="warning", duration=5)
+        return(NULL)
+      }
+      fun_sub <- lapply(proj$functions[[fun_level]], function(m) {
+        if (is.matrix(m) || is.data.frame(m)) m[rownames(m) %in% matched, , drop=FALSE] else m
+      })
+      proj$functions[[fun_level]] <- fun_sub
+    }
+
+    # Get count matrix
+    mat <- tryCatch(proj$functions[[fun_level]][[input$func_count]], error=function(e) NULL)
+    req(!is.null(mat) && (is.matrix(mat) || is.data.frame(mat)) && nrow(mat) > 0)
+    mat <- as.matrix(mat)
+
+    # Remove Unclassified rows
+    unclass_pat <- "^[Uu]nclassified$|^[Uu]nclassified |^No [Hh]it|^Unknown$"
+    keep_rows <- !grepl(unclass_pat, rownames(mat))
+    mat <- mat[keep_rows, , drop=FALSE]
+    req(nrow(mat) > 0)
+
+    # Take top N by total abundance
+    n_funcs <- min(input$n_funcs %||% 20, nrow(mat))
+    row_totals <- rowSums(mat, na.rm=TRUE)
+    top_idx <- order(row_totals, decreasing=TRUE)[seq_len(n_funcs)]
+    mat <- mat[top_idx, , drop=FALSE]
+
+    # Enrich row names with function names if available
+    fun_names <- tryCatch(proj$misc[[paste0(fun_level,"_names")]], error=function(e) NULL)
+    if (!is.null(fun_names) && length(fun_names) > 0) {
+      rn <- rownames(mat)
+      nm <- fun_names[rn]
+      nm[is.na(nm)] <- ""
+      rownames(mat) <- ifelse(nchar(nm) > 0, paste0(rn, ": ", nm), rn)
+    }
+
+    # Order rows by total (top at top of heatmap)
+    mat <- mat[order(rowSums(mat, na.rm=TRUE), decreasing=TRUE), , drop=FALSE]
+
+    # Build plotly heatmap with Blues colorscale
+    p <- plot_ly(
+      z         = mat,
+      x         = colnames(mat),
+      y         = rownames(mat),
+      type      = "heatmap",
+      colorscale = input$func_palette %||% "Blues",
+      reversescale = FALSE,
+      hovertemplate = "<b>%{y}</b><br>Sample: %{x}<br>Value: %{z}<extra></extra>"
+    )
+    pw <- input$func_plot_width  %||% 1200
+    ph <- input$func_plot_height %||% 560
+    p <- layout(p,
+      width  = pw,
+      height = ph,
+      xaxis  = list(title="", tickfont=list(size=fs), tickangle=-45, automargin=TRUE),
+      yaxis  = list(title="", tickfont=list(size=fs), automargin=TRUE, autorange="reversed"),
+      margin = list(l=10, r=10, t=30, b=60),
+      paper_bgcolor = "rgba(0,0,0,0)",
+      plot_bgcolor  = "rgba(0,0,0,0)"
+    )
+    p <- config(p, displayModeBar=FALSE)
+    p
+  })
+
+  output$sqm_func_plot <- renderPlotly({ func_plot_reactive() })
   output$plot_status_badge <- renderUI({
     if (is.null(sqm_data())) tags$span(class="badge",style="background:#eef2f7;color:#7a90a8;font-size:0.72rem;border:1px solid #d0dae6;","No project")
     else tags$span(class="badge",style="background:rgba(26,158,110,0.1);color:#1a9e6e;font-size:0.72rem;border:1px solid rgba(26,158,110,0.3);","\u25cf Ready")
@@ -2418,6 +2525,15 @@ server <- function(input, output, session) {
   }
 
 
+  # Show loading banner when table selection changes
+  observeEvent(active_table(), {
+    req(active_table() != "none")
+    shinyjs::runjs("
+      var b = document.getElementById('tbl_loading_banner');
+      if (b) { b.style.display = 'flex'; }
+    ")
+  })
+
   get_table_data <- reactive({
     req(sqm_data())
     proj <- sqm_data()
@@ -2445,6 +2561,10 @@ server <- function(input, output, session) {
   })
   output$data_table <- renderDT({
     df <- get_table_data(); req(df)
+    shinyjs::runjs("
+      var b = document.getElementById('tbl_loading_banner');
+      if (b) { b.style.display = 'none'; }
+    ")
     tt <- active_table()
     row_label <- if      (tt == "contigs")          "Contig"
                  else if (tt == "orfs")             "ORF"
