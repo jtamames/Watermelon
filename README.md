@@ -271,6 +271,177 @@ Ordination analysis on taxonomy or functional abundance data. Requires the `vega
 
 ---
 
+## Server deployment (remote access)
+
+This section explains how to make SQMxplore accessible to remote users via **Shiny Server**, running permanently on a Linux machine.
+
+### 1. Install R packages on the server
+
+All packages must be installed as root so Shiny Server can find them:
+
+```bash
+sudo R -e "install.packages(c('shiny','shinyjs','shinyFiles','bslib','DT','plotly','SQMtools','vegan'), repos='https://cran.rstudio.com/')"
+
+# Optional: pathview
+sudo R -e "if (!require('BiocManager', quietly=TRUE)) install.packages('BiocManager'); BiocManager::install('pathview')"
+```
+
+If you are on Ubuntu inside a conda environment and get compilation errors, use RSPM precompiled binaries first (see [System dependencies](#system-dependencies) above).
+
+### 2. Install Shiny Server
+
+```bash
+# Check https://posit.co/download/shiny-server/ for the latest version
+wget https://download3.rstudio.org/ubuntu-18.04/x86_64/shiny-server-1.5.21.1012-amd64.deb
+sudo dpkg -i shiny-server-1.5.21.1012-amd64.deb
+```
+
+### 3. Deploy the app
+
+```bash
+sudo mkdir -p /srv/shiny-server/sqmxplore
+sudo cp /path/to/app.R /srv/shiny-server/sqmxplore/
+```
+
+### 4. Configure Shiny Server
+
+Edit `/etc/shiny-server/shiny-server.conf`:
+
+```
+run_as shiny;
+
+server {
+  listen 3838;
+
+  location /sqmxplore {
+    app_dir /srv/shiny-server/sqmxplore;
+    log_dir /var/log/shiny-server;
+  }
+}
+```
+
+### 5. Grant data access to the shiny user
+
+The `shiny` system user needs read access to the SqueezeMeta project directories:
+
+```bash
+# Option A: add shiny to the group that owns the data
+sudo usermod -aG your_data_group shiny
+
+# Option B: grant read access explicitly
+sudo chmod -R o+rX /path/to/your/sqm/projects
+```
+
+### 6. Start and enable the service
+
+```bash
+sudo systemctl start shiny-server
+sudo systemctl enable shiny-server   # start automatically on reboot
+sudo systemctl status shiny-server   # verify it is running
+```
+
+### 7. Open the firewall port
+
+```bash
+sudo ufw allow 3838/tcp
+```
+
+### 8. Access the app
+
+Users on the same network can now open:
+
+```
+http://<server-ip>:3838/sqmxplore
+```
+
+To find the server IP: `hostname -I`
+
+---
+
+## Remote access from outside the local network
+
+### Option A: SSH tunnel (no server config needed, encrypted)
+
+The remote user runs this on their own machine:
+
+```bash
+ssh -L 3838:localhost:3838 user@server-ip
+```
+
+Then opens `http://localhost:3838/sqmxplore` in their browser. No firewall changes needed beyond standard SSH access.
+
+### Option B: nginx reverse proxy with HTTPS (permanent, production)
+
+```bash
+sudo apt-get install -y nginx certbot python3-certbot-nginx
+```
+
+Create `/etc/nginx/sites-available/sqmxplore`:
+
+```nginx
+server {
+    listen 80;
+    server_name sqmxplore.yourdomain.org;
+
+    location /sqmxplore/ {
+        proxy_pass http://localhost:3838/sqmxplore/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_read_timeout 3600;
+    }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/sqmxplore /etc/nginx/sites-enabled/
+sudo systemctl restart nginx
+sudo certbot --nginx -d sqmxplore.yourdomain.org
+```
+
+Users then access `https://sqmxplore.yourdomain.org/sqmxplore`.
+
+### Option C: ngrok (quick demo, no domain needed)
+
+```bash
+# Install from https://ngrok.com, then:
+ngrok http 3838
+```
+
+ngrok prints a temporary public URL (e.g. `https://abc123.ngrok.io`). The tunnel stays alive as long as the process runs.
+
+---
+
+## Troubleshooting (server)
+
+**App does not load / blank page**
+```bash
+tail -f /var/log/shiny-server/*.log
+```
+
+**Missing R packages** — the log will show `Error in library(...)`. Install as root (see step 1).
+
+**shiny user cannot read project files**
+```bash
+sudo chmod -R o+rX /path/to/sqm/project
+```
+
+**Port 3838 not reachable**
+```bash
+sudo ufw status
+sudo ufw allow 3838/tcp
+ss -tlnp | grep 3838
+```
+
+**KronaTools not found by shiny user**
+```bash
+sudo -u shiny which ktImportText
+# If not found, add KronaTools bin to /etc/environment
+```
+
+---
+
 ## Citation
 
 If you use SqueezeMeta or SQMtools in your research, please cite:
