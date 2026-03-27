@@ -1622,12 +1622,7 @@ ui <- page_navbar(
           downloadButton("download_table", "Download CSV", class = "btn-outline-secondary w-100"))
       ),
       card(card_header("Data"), card_body(class = "p-2",
-        tags$div(id = "tbl_loading_banner",
-          style = paste0("display:none; align-items:center; gap:10px; padding:1.5rem;",
-                         "color:#1a6eb5; font-size:0.88rem;"),
-          tags$span(style="font-size:1.4rem;", "⌛"),
-          tags$span("Loading results, please wait…")),
-        DTOutput("data_table")))
+        uiOutput("tbl_main_ui")))
     )
   ),
   nav_panel("Krona",
@@ -1792,12 +1787,13 @@ server <- function(input, output, session) {
   #    assembly/taxonomy/functions use ignoreInit=TRUE (multi-option selectors).
   #    bins uses a dedicated actionButton to avoid the single-option problem.
   active_tbl_rv  <- reactiveVal("none")
+  tbl_status     <- reactiveVal("idle")   # idle | loading | ready
+  tbl_data_rv    <- reactiveVal(NULL)     # holds the loaded data.frame
 
-  observeEvent(input$tbl_assembly,  ignoreNULL=TRUE, ignoreInit=TRUE,
-    { active_tbl_rv(input$tbl_assembly) })
-  observeEvent(input$tbl_taxonomy,  ignoreNULL=TRUE, ignoreInit=TRUE, {
-    active_tbl_rv(input$tbl_taxonomy)
-    # Update metric choices for new rank
+  observeEvent(input$tbl_assembly, ignoreNULL=TRUE, ignoreInit=TRUE, {
+    do_load_table(input$tbl_assembly)
+  })
+  observeEvent(input$tbl_taxonomy, ignoreNULL=TRUE, ignoreInit=TRUE, {
     proj <- sqm_data(); req(proj)
     rank <- sub("^tax_", "", input$tbl_taxonomy)
     metrics <- avail_tax_metrics(proj, rank)
@@ -1805,10 +1801,9 @@ server <- function(input, output, session) {
     sel <- if (!is.null(cur) && cur %in% metrics) cur else
            if ("percent" %in% metrics) "percent" else metrics[[1]]
     updateSelectInput(session, "tbl_tax_metric", choices = metrics, selected = sel)
+    do_load_table(input$tbl_taxonomy)
   })
   observeEvent(input$tbl_functions, ignoreNULL=TRUE, ignoreInit=TRUE, {
-    active_tbl_rv(input$tbl_functions)
-    # Update metric choices for new DB
     proj <- sqm_data(); req(proj)
     db <- toupper(sub("^fun_", "", input$tbl_functions))
     metrics <- avail_fun_metrics(proj, db)
@@ -1816,19 +1811,52 @@ server <- function(input, output, session) {
     sel <- if (!is.null(cur) && cur %in% metrics) cur else
            if ("abund" %in% metrics) "abund" else metrics[[1]]
     updateSelectInput(session, "tbl_fun_metric", choices = metrics, selected = sel)
+    do_load_table(input$tbl_functions)
   })
-  observeEvent(input$tbl_bins_btn,  ignoreNULL=TRUE, ignoreInit=TRUE,
-    { active_tbl_rv("bins") })
+  observeEvent(input$tbl_bins_btn, ignoreNULL=TRUE, ignoreInit=TRUE, {
+    do_load_table("bins")
+  })
 
   # Initialise on project load
   observeEvent(sqm_data(), {
     proj <- sqm_data(); req(proj)
     first <- c(avail_assembly(proj), avail_taxonomy(proj),
                avail_functions(proj), avail_bins(proj))
-    if (length(first) > 0) active_tbl_rv(first[[1]])
+    if (length(first) > 0) do_load_table(first[[1]])
   })
 
   active_table <- reactive({ active_tbl_rv() })
+
+  # Central loader: sets status loading, renders spinner, then loads in delay
+  do_load_table <- function(tt) {
+    tbl_status("loading")
+    tbl_data_rv(NULL)
+    shinyjs::delay(50, {
+      active_tbl_rv(tt)
+      proj <- sqm_data()
+      smp  <- isolate(input$selected_samples)
+      df <- tryCatch({
+        if      (tt == "contigs") as.data.frame(proj$contigs$table)
+        else if (tt == "orfs")    as.data.frame(proj$orfs$table)
+        else if (tt == "bins")    as.data.frame(proj$bins$table)
+        else if (startsWith(tt, "tax_")) {
+          rank   <- sub("^tax_", "", tt)
+          metric <- isolate(input$tbl_tax_metric) %||% "abund"
+          d <- as.data.frame(proj$taxa[[rank]][[metric]])
+          if (!is.null(smp) && length(smp) > 0) d[, colnames(d) %in% smp, drop=FALSE] else d
+        }
+        else if (startsWith(tt, "fun_")) {
+          db     <- toupper(sub("^fun_", "", tt))
+          metric <- isolate(input$tbl_fun_metric) %||% "abund"
+          d <- as.data.frame(proj$functions[[db]][[metric]])
+          if (!is.null(smp) && length(smp) > 0) d <- d[, colnames(d) %in% smp, drop=FALSE]
+          enrich_fun_table(proj, db, d)
+        }
+      }, error = function(e) NULL)
+      tbl_data_rv(df)
+      tbl_status("ready")
+    })
+  }
 
   shinyDirChoose(input, "dir_project",       roots = roots)
   shinyDirChoose(input, "dir_manual_tables", roots = roots)
@@ -2243,7 +2271,9 @@ server <- function(input, output, session) {
           tags$div(class="form-label",style="margin-top:4px;","Colour palette"),
           selectInput("func_palette", NULL,
             choices = c("Blues","Viridis","YlOrRd","RdBu","Greens","Hot","Portland","Jet"),
-            selected = "Blues")
+            selected = "Blues"),
+          tags$div(class="form-label",style="margin-top:4px;","Label width (chars)"),
+          numericInput("func_label_width", NULL, value=40, min=10, max=200, step=5)
         )
       )
     } else NULL
@@ -2447,6 +2477,27 @@ server <- function(input, output, session) {
       rownames(mat) <- ifelse(nchar(nm) > 0, paste0(rn, ": ", nm), rn)
     }
 
+    # Wrap long row labels every N characters
+    lw <- input$func_label_width %||% 40
+    wrap_label <- function(s) {
+      if (nchar(s) <= lw) return(s)
+      words <- strsplit(s, " ")[[1]]
+      lines <- ""; cur <- ""
+      for (w in words) {
+        if (nchar(cur) == 0) {
+          cur <- w
+        } else if (nchar(cur) + 1 + nchar(w) <= lw) {
+          cur <- paste(cur, w)
+        } else {
+          lines <- if (nchar(lines) == 0) cur else paste0(lines, "<br>", cur)
+          cur <- w
+        }
+      }
+      if (nchar(cur) > 0) lines <- if (nchar(lines) == 0) cur else paste0(lines, "<br>", cur)
+      lines
+    }
+    rownames(mat) <- sapply(rownames(mat), wrap_label, USE.NAMES=FALSE)
+
     # Order rows by total (top at top of heatmap)
     mat <- mat[order(rowSums(mat, na.rm=TRUE), decreasing=TRUE), , drop=FALSE]
 
@@ -2525,46 +2576,24 @@ server <- function(input, output, session) {
   }
 
 
-  # Show loading banner when table selection changes
-  observeEvent(active_table(), {
-    req(active_table() != "none")
-    shinyjs::runjs("
-      var b = document.getElementById('tbl_loading_banner');
-      if (b) { b.style.display = 'flex'; }
-    ")
+  get_table_data <- reactive({ tbl_data_rv() })
+  output$tbl_main_ui <- renderUI({
+    s <- tbl_status()
+    if (s == "idle") return(
+      tags$div(style = "color:var(--muted); font-size:0.85rem; padding:2rem; text-align:center;",
+        tags$div(style = "font-size:2rem; margin-bottom:8px;", "📄"),
+        tags$div("Select a table from the sidebar.")))
+    if (s == "loading") return(
+      tags$div(
+        style = paste0("display:flex; align-items:center; gap:10px;",
+                       "padding:1.5rem; color:#1a6eb5; font-size:0.88rem;"),
+        tags$span(style="font-size:1.5rem;", "◌"),
+        tags$span("Loading results, please wait…")))
+    if (s == "ready") DTOutput("data_table") else NULL
   })
 
-  get_table_data <- reactive({
-    req(sqm_data())
-    proj <- sqm_data()
-    tt   <- active_table()
-    req(!is.null(tt) && tt != "none")
-    smp  <- input$selected_samples
-    tryCatch({
-      if      (tt == "contigs") as.data.frame(proj$contigs$table)
-      else if (tt == "orfs")    as.data.frame(proj$orfs$table)
-      else if (tt == "bins")    as.data.frame(proj$bins$table)
-      else if (startsWith(tt, "tax_")) {
-        rank   <- sub("^tax_", "", tt)
-        metric <- input$tbl_tax_metric %||% "abund"
-        d <- as.data.frame(proj$taxa[[rank]][[metric]])
-        if (!is.null(smp) && length(smp) > 0) d[, colnames(d) %in% smp, drop = FALSE] else d
-      }
-      else if (startsWith(tt, "fun_")) {
-        db     <- toupper(sub("^fun_", "", tt))
-        metric <- input$tbl_fun_metric %||% "abund"
-        d  <- as.data.frame(proj$functions[[db]][[metric]])
-        if (!is.null(smp) && length(smp) > 0) d <- d[, colnames(d) %in% smp, drop = FALSE]
-        enrich_fun_table(proj, db, d)
-      }
-    }, error = function(e) NULL)
-  })
   output$data_table <- renderDT({
     df <- get_table_data(); req(df)
-    shinyjs::runjs("
-      var b = document.getElementById('tbl_loading_banner');
-      if (b) { b.style.display = 'none'; }
-    ")
     tt <- active_table()
     row_label <- if      (tt == "contigs")          "Contig"
                  else if (tt == "orfs")             "ORF"
