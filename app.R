@@ -2227,7 +2227,7 @@ server <- function(input, output, session) {
           tags$div(style="display:grid;grid-template-columns:1fr 1fr;gap:0;",
             checkboxInput("tax_ignore_unmapped","Ignore unmapped",value=FALSE),
             checkboxInput("tax_ignore_unclassified","Ignore unclassified",value=FALSE),
-            checkboxInput("tax_no_partial_classifications","No partial classif.",value=FALSE),
+            checkboxInput("tax_no_partial_classifications","No ambiguous taxa",value=FALSE),
             checkboxInput("tax_rescale","Rescale",value=FALSE)
           )
         ),
@@ -2241,8 +2241,8 @@ server <- function(input, output, session) {
           numericInput("tax_font_size",NULL,value=11,min=6,max=24,step=1),
           tags$div(class="form-label",style="margin-top:4px;","Colour palette"),
           selectInput("tax_palette", NULL,
-            choices = c("Blues","Viridis","YlOrRd","RdBu","Greens","Set2","Pastel1","Paired"),
-            selected = "Blues"),
+            choices = c("Paired","Set2","Set3","Dark2","Tableau10","Alphabet","Polychrome36"),
+            selected = "Paired"),
           tags$div(class="form-label",style="margin-top:4px;","Label width (chars)"),
           numericInput("tax_label_width", NULL, value=30, min=5, max=100, step=5)
         )
@@ -2416,16 +2416,35 @@ server <- function(input, output, session) {
     mat    <- as.matrix(mat)
 
     # Filter options
+    # Always remove "No CDS"
+    mat <- mat[!grepl("^[Nn]o CDS$", rownames(mat)), , drop=FALSE]
     if (isTRUE(input$tax_ignore_unmapped))
       mat <- mat[!grepl("^[Uu]nmapped$|^[Nn]o [Hh]it", rownames(mat)), , drop=FALSE]
     if (isTRUE(input$tax_ignore_unclassified))
-      mat <- mat[!grepl("^[Uu]nclassified", rownames(mat)), , drop=FALSE]
+      mat <- mat[!grepl("^[Uu]nclassified$", rownames(mat)), , drop=FALSE]
+    if (isTRUE(input$tax_no_partial_classifications))
+      mat <- mat[!grepl("^[Uu]nclassified ", rownames(mat)), , drop=FALSE]
     req(nrow(mat) > 0)
 
-    # Top N
+    # Rescale each sample to 100% (only meaningful for percentages)
+    if (isTRUE(input$tax_rescale) && count == "percent") {
+      col_sums <- colSums(mat, na.rm=TRUE)
+      col_sums[col_sums == 0] <- 1
+      mat <- sweep(mat, 2, col_sums, "/") * 100
+    }
+
+    # Top N + Other
     n_taxa <- min(input$n_taxa %||% 15, nrow(mat))
-    top_idx <- order(rowSums(mat, na.rm=TRUE), decreasing=TRUE)[seq_len(n_taxa)]
-    mat <- mat[top_idx, , drop=FALSE]
+    all_idx <- order(rowSums(mat, na.rm=TRUE), decreasing=TRUE)
+    top_idx <- all_idx[seq_len(n_taxa)]
+    rest_idx <- all_idx[seq(n_taxa + 1, nrow(mat))]
+    if (length(rest_idx) > 0) {
+      other_row <- matrix(colSums(mat[rest_idx, , drop=FALSE], na.rm=TRUE),
+                          nrow=1, dimnames=list("Other", colnames(mat)))
+      mat <- rbind(mat[top_idx, , drop=FALSE], other_row)
+    } else {
+      mat <- mat[top_idx, , drop=FALSE]
+    }
 
     # Wrap labels
     wrap_label <- function(s) {
@@ -2442,22 +2461,38 @@ server <- function(input, output, session) {
     }
     taxa_labels <- sapply(rownames(mat), wrap_label, USE.NAMES=FALSE)
 
-    # Colour palette
+    # Colour palette — all qualitative, high contrast between categories
     n_taxa_show <- nrow(mat)
-    colours <- if (pal %in% c("Set2","Pastel1","Paired")) {
-      grDevices::palette.colors(n=max(n_taxa_show, 3), palette=pal)[seq_len(n_taxa_show)]
+    qual_base <- list(
+      Paired       = c("#a6cee3","#1f78b4","#b2df8a","#33a02c","#fb9a99","#e31a1c",
+                       "#fdbf6f","#ff7f00","#cab2d6","#6a3d9a","#ffff99","#b15928"),
+      Set2         = c("#66c2a5","#fc8d62","#8da0cb","#e78ac3","#a6d854","#ffd92f",
+                       "#e5c494","#b3b3b3"),
+      Set3         = c("#8dd3c7","#ffffb3","#bebada","#fb8072","#80b1d3","#fdb462",
+                       "#b3de69","#fccde5","#d9d9d9","#bc80bd","#ccebc5","#ffed6f"),
+      Dark2        = c("#1b9e77","#d95f02","#7570b3","#e7298a","#66a61e","#e6ab02",
+                       "#a6761d","#666666"),
+      Tableau10    = c("#4e79a7","#f28e2b","#e15759","#76b7b2","#59a14f","#edc948",
+                       "#b07aa1","#ff9da7","#9c755f","#bab0ac"),
+      Alphabet     = c("#aa0dfe","#3283fe","#85660d","#782ab6","#565656","#1c8356",
+                       "#16ff32","#f7e1a0","#e2e2e2","#1cbe4f","#c4451c","#dee5f2",
+                       "#fa0087","#fc1cbf","#f0a0ff","#224808","#fbe426","#bdcdff",
+                       "#b5ede5","#7ed7d1","#1d8f2c","#325a9b","#feaf16","#f8a19f",
+                       "#90ad1c","#f6222e","#ffd6cc","#c075a6","#fc33c5","#683b79",
+                       "#b4c687","#b0e0e6"),
+      Polychrome36 = c("#5a5156","#e4e1e3","#f6222e","#fe6c00","#16ff32","#3283fe",
+                       "#feaf16","#b00068","#1cbe4f","#c4451c","#dee5f2","#325a9b",
+                       "#f8a19f","#90ad1c","#f6222e","#1d8f2c","#c075a6","#7ed7d1",
+                       "#b5ede5","#782ab6","#aa0dfe","#fa0087","#fbe426","#bdcdff",
+                       "#b4c687","#fc1cbf","#f0a0ff","#224808","#ffd6cc","#fc33c5",
+                       "#feaf16","#f8a19f","#563d7c","#4cadb5","#a05e36","#e2e2e2")
+    )
+    base_cols <- qual_base[[pal]]
+    if (is.null(base_cols)) base_cols <- qual_base[["Paired"]]
+    colours <- if (n_taxa_show <= length(base_cols)) {
+      base_cols[seq_len(n_taxa_show)]
     } else {
-      colorRampPalette(switch(pal,
-        Blues    = c("#deebf7","#084594"),
-        Viridis  = c("#440154","#31688e","#35b779","#fde725"),
-        YlOrRd   = c("#ffffb2","#fd8d3c","#bd0026"),
-        RdBu     = c("#2166ac","#f7f7f7","#d6604d"),
-        Greens   = c("#e5f5e0","#006d2c"),
-        Hot      = c("#ffffff","#ff6600","#cc0000"),
-        Portland = c("#0c3383","#2182bd","#94bfe1","#fbefcc","#e28f67","#b1513d","#6f0d0d"),
-        Jet      = c("#00007f","#0000ff","#007fff","#00ffff","#7fff7f","#ffff00","#ff7f00","#ff0000","#7f0000"),
-        c("#deebf7","#084594")
-      ))(n_taxa_show)
+      colorRampPalette(base_cols)(n_taxa_show)
     }
 
     # Build stacked bar chart (one bar per sample, stacked by taxon)
