@@ -65,11 +65,14 @@ install.packages(
 )
 ```
 
-### plotly (optional, required for function heatmaps in Plots tab)
+### plotly, ggplot2, gridExtra (optional, required for Plots tab)
 
 ```r
-install.packages("plotly")
+install.packages(c("plotly", "ggplot2", "gridExtra", "gtable", "RColorBrewer", "viridisLite", "pheatmap", "heatmaply"))
 ```
+
+- `plotly` — interactive barplots (taxonomy, functions)
+- `pheatmap` + `RColorBrewer` + `viridisLite` — clustered heatmaps with dendrograms
 
 ### vegan (optional, required for Multivariate tab)
 
@@ -263,7 +266,14 @@ Ordination analysis on taxonomy or functional abundance data. Requires the `vega
 | DT | CRAN | Yes |
 | SQMtools | CRAN / SqueezeMeta repo | Yes |
 | pandoc | conda-forge / system | Yes (needed by DT in conda envs) |
-| plotly | CRAN | Plots tab (function heatmaps) |
+| plotly | CRAN | Plots tab (barplots) |
+| ggplot2 | CRAN | Plots tab (clustered heatmaps) |
+| gridExtra | CRAN | Plots tab (clustered heatmaps) |
+| gtable | CRAN | Plots tab (clustered heatmaps) |
+| RColorBrewer | CRAN | Plots tab (clustered heatmaps) |
+| viridisLite | CRAN | Plots tab (clustered heatmaps) |
+| pheatmap | CRAN | Plots tab (clustered heatmaps) |
+| heatmaply | CRAN | Plots tab (clustered heatmaps, interactive hover) |
 | vegan | CRAN | Multivariate tab only |
 | pathview | Bioconductor | Pathways tab only |
 | KEGGREST | Bioconductor (auto-installed with pathview) | Pathways tab only |
@@ -280,7 +290,7 @@ This section explains how to make SQMxplore accessible to remote users via **Shi
 All packages must be installed as root so Shiny Server can find them:
 
 ```bash
-sudo R -e "install.packages(c('shiny','shinyjs','shinyFiles','bslib','DT','plotly','SQMtools','vegan'), repos='https://cran.rstudio.com/')"
+sudo R -e "install.packages(c('shiny','shinyjs','shinyFiles','bslib','DT','plotly','ggplot2','gridExtra','gtable','RColorBrewer','viridisLite','pheatmap','heatmaply','SQMtools','vegan'), repos='https://cran.rstudio.com/')"
 
 # Optional: pathview
 sudo R -e "if (!require('BiocManager', quietly=TRUE)) install.packages('BiocManager'); BiocManager::install('pathview')"
