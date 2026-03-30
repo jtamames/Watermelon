@@ -341,15 +341,19 @@ available_plot_types <- function(proj) {
   has_tax <- any(sapply(c("phylum","class","order","family","genus","species"), function(r)
     tryCatch(has_data(proj$taxa[[r]]$percent), error = function(e) FALSE)
   ))
-  if (has_tax) choices <- c(choices, "Taxonomy (barplot)" = "taxonomy_bar")
+  if (has_tax) choices <- c(choices,
+    "Taxonomy (barplot)"  = "taxonomy_bar",
+    "Taxonomy (heatmap)"  = "taxonomy_heatmap")
   # Functions: COG, KEGG, PFAM, plus any extra databases
   all_dbs <- tryCatch(names(proj$functions), error = function(e) character(0))
   for (db in all_dbs) {
     tbl <- tryCatch(proj$functions[[db]]$abund, error = function(e) NULL)
     if (has_data(tbl)) {
-      val   <- paste0("func_", tolower(db))
-      label <- paste(db, "functions")
-      choices <- c(choices, setNames(val, label))
+      val      <- paste0("func_", tolower(db))
+      label    <- paste(db, "functions (barplot)")
+      val_hm   <- paste0("heatmap_", tolower(db))
+      label_hm <- paste(db, "functions (heatmap)")
+      choices  <- c(choices, setNames(val, label), setNames(val_hm, label_hm))
     }
   }
   # Bins
@@ -1605,7 +1609,68 @@ ui <- page_navbar(
       card(
         card_header(div(style = "display:flex; justify-content:space-between; align-items:center;",
           span("Visualization"), uiOutput("plot_status_badge"))),
-        card_body(class = "p-2", uiOutput("sqm_plot_ui"))
+        card_body(class = "p-2",
+          # ── Format bar: taxonomy controls (hidden by default) ──
+          tags$div(id = "fmt_tax",
+            style = "display:none;",
+            tags$div(
+              style = "display:flex; gap:8px; align-items:center; margin-bottom:6px; flex-wrap:wrap; padding:2px;",
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "W:"),
+              numericInput("tax_plot_width",  NULL, value=1200, min=400, max=4000, step=50, width="80px"),
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "H:"),
+              numericInput("tax_plot_height", NULL, value=560,  min=200, max=3000, step=50, width="80px"),
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "Font:"),
+              numericInput("tax_font_size",   NULL, value=11,   min=6,   max=24,   step=1,  width="65px"),
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "Palette:"),
+              selectInput("tax_palette", NULL,
+                choices  = c("Paired","Set2","Set3","Dark2","Tableau10","Alphabet","Polychrome36"),
+                selected = "Paired", width="110px"),
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "Label width:"),
+              numericInput("tax_label_width", NULL, value=30, min=5, max=100, step=5, width="65px")
+            )
+          ),
+          # ── Format bar: function controls (hidden by default) ──
+          tags$div(id = "fmt_func",
+            style = "display:none;",
+            tags$div(
+              style = "display:flex; gap:8px; align-items:center; margin-bottom:6px; flex-wrap:wrap; padding:2px;",
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "W:"),
+              numericInput("func_plot_width",  NULL, value=1200, min=400, max=4000, step=50, width="80px"),
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "H:"),
+              numericInput("func_plot_height", NULL, value=560,  min=200, max=3000, step=50, width="80px"),
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "Font:"),
+              numericInput("func_font_size",   NULL, value=11,   min=6,   max=24,   step=1,  width="65px"),
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "Palette:"),
+              selectInput("func_palette", NULL,
+                choices  = c("Blues","Viridis","YlOrRd","RdBu","Greens","Hot","Portland","Jet"),
+                selected = "Blues", width="100px"),
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "Label width:"),
+              numericInput("func_label_width", NULL, value=40, min=10, max=200, step=5, width="65px")
+            )
+          ),
+          # ── Format bar: heatmap controls (hidden by default) ──
+          tags$div(id = "fmt_heatmap",
+            style = "display:none;",
+            tags$div(
+              style = "display:flex; gap:8px; align-items:center; margin-bottom:6px; flex-wrap:wrap; padding:2px;",
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "W:"),
+              numericInput("hm_plot_width",  NULL, value=800, min=300, max=4000, step=50, width="80px"),
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "H:"),
+              numericInput("hm_plot_height", NULL, value=600, min=200, max=3000, step=50, width="80px"),
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "Font:"),
+              numericInput("hm_font_size",   NULL, value=10,  min=6,   max=24,   step=1,  width="65px"),
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "Palette:"),
+              selectInput("hm_palette", NULL,
+                choices  = c("Blues","Viridis","RdBu","YlOrRd","RdYlBu","Portland","Plasma","Cividis"),
+                selected = "Blues", width="100px"),
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "Scale:"),
+              selectInput("hm_scale", NULL,
+                choices  = c("None" = "none", "Log10(x+1)" = "log", "Z-score (rows)" = "zscore_row", "Z-score (cols)" = "zscore_col"),
+                selected = "log", width="130px")
+            )
+          ),
+          uiOutput("sqm_plot_ui")
+        )
       )
     )
   ),
@@ -1727,6 +1792,22 @@ server <- function(input, output, session) {
     selected <- if (!is.null(cur) && cur %in% choices) cur else choices[[1]]
     selectInput("plot_type", NULL, choices = choices, selected = selected)
   })
+
+  # u2500u2500 Show/hide format bars based on plot type u2500u2500
+  observeEvent(input$plot_type, {
+    pt <- input$plot_type %||% ""
+    is_hm <- startsWith(pt, "heatmap_") || pt == "taxonomy_heatmap"
+    if (pt == "taxonomy_bar") {
+      shinyjs::show("fmt_tax"); shinyjs::hide("fmt_func"); shinyjs::hide("fmt_heatmap")
+    } else if (pt %in% c("func_cog","func_kegg","func_pfam")) {
+      shinyjs::hide("fmt_tax"); shinyjs::show("fmt_func"); shinyjs::hide("fmt_heatmap")
+    } else if (is_hm) {
+      shinyjs::hide("fmt_tax"); shinyjs::hide("fmt_func"); shinyjs::show("fmt_heatmap")
+    } else {
+      shinyjs::hide("fmt_tax"); shinyjs::hide("fmt_func"); shinyjs::hide("fmt_heatmap")
+    }
+  }, ignoreNULL = FALSE)
+
 
   # \u2500\u2500 Dynamic table type selector \u2014 only shows available options \u2500\u2500
   # \u2500\u2500 Build each category box (only shown when choices exist) \u2500\u2500
@@ -2240,21 +2321,6 @@ server <- function(input, output, session) {
             checkboxInput("tax_rescale","Rescale",value=FALSE)
           )
         ),
-        tags$div(class="sidebar-box",style="margin-top:8px;",
-          tags$div(style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--blue);margin-bottom:5px;","Format plot"),
-          tags$div(style="display:grid;grid-template-columns:1fr 1fr;gap:4px;",
-            tags$div(tags$div(class="form-label","Width (px)"),  numericInput("tax_plot_width", NULL,value=1200,min=400,max=4000,step=50)),
-            tags$div(tags$div(class="form-label","Height (px)"), numericInput("tax_plot_height",NULL,value=560,min=200,max=3000,step=50))
-          ),
-          tags$div(class="form-label",style="margin-top:4px;","Font size"),
-          numericInput("tax_font_size",NULL,value=11,min=6,max=24,step=1),
-          tags$div(class="form-label",style="margin-top:4px;","Colour palette"),
-          selectInput("tax_palette", NULL,
-            choices = c("Paired","Set2","Set3","Dark2","Tableau10","Alphabet","Polychrome36"),
-            selected = "Paired"),
-          tags$div(class="form-label",style="margin-top:4px;","Label width (chars)"),
-          numericInput("tax_label_width", NULL, value=30, min=5, max=100, step=5)
-        )
       )
     } else if (pt %in% c("func_cog","func_kegg","func_pfam")) {
       fun_label <- switch(pt,func_cog="COG",func_kegg="KEGG",func_pfam="PFAM")
@@ -2273,20 +2339,51 @@ server <- function(input, output, session) {
           tags$div(class="form-label","Count type"), uiOutput("func_count_ui"),
           tags$div(class="form-label",style="margin-top:4px;","No. of functions"), numericInput("n_funcs", NULL, value=20, min=1, max=500, step=1)
         ),
+      )
+    } else if (pt == "taxonomy_heatmap") {
+      tax_counts  <- if (!is.null(sqm_data())) available_tax_counts(sqm_data()) else c("Percentages"="percent")
+      avail_ranks <- if (!is.null(sqm_data())) available_tax_ranks(sqm_data())  else c("Phylum"="phylum")
+      tagList(
+        tags$div(class="sidebar-box",
+          tags$div(class="form-label","Taxonomic rank"),
+          selectInput("hm_tax_rank", NULL, choices=avail_ranks),
+          tags$div(class="form-label",style="margin-top:4px;","Count type"),
+          selectInput("hm_tax_count", NULL, choices=tax_counts,
+            selected=if("percent"%in%tax_counts)"percent" else tax_counts[[1]]),
+          tags$div(class="form-label",style="margin-top:4px;","No. of features (top N)"),
+          numericInput("hm_n_features", NULL, value=30, min=2, max=500, step=1)
+        ),
         tags$div(class="sidebar-box",style="margin-top:8px;",
-          tags$div(style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--blue);margin-bottom:5px;","Format plot"),
-          tags$div(style="display:grid;grid-template-columns:1fr 1fr;gap:4px;",
-            tags$div(tags$div(class="form-label","Width (px)"),  numericInput("func_plot_width", NULL,value=1200,min=400,max=4000,step=50)),
-            tags$div(tags$div(class="form-label","Height (px)"), numericInput("func_plot_height",NULL,value=560,min=200,max=3000,step=50))
-          ),
-          tags$div(class="form-label",style="margin-top:4px;","Font size"),
-          numericInput("func_font_size",NULL,value=11,min=6,max=24,step=1),
-          tags$div(class="form-label",style="margin-top:4px;","Colour palette"),
-          selectInput("func_palette", NULL,
-            choices = c("Blues","Viridis","YlOrRd","RdBu","Greens","Hot","Portland","Jet"),
-            selected = "Blues"),
-          tags$div(class="form-label",style="margin-top:4px;","Label width (chars)"),
-          numericInput("func_label_width", NULL, value=40, min=10, max=200, step=5)
+          tags$div(class="form-label","Clustering method"),
+          selectInput("hm_clust_method", NULL,
+            choices=c("Ward D2"="ward.D2","Complete"="complete","Average"="average","Single"="single"),
+            selected="ward.D2"),
+          tags$div(class="form-label",style="margin-top:4px;","Distance metric"),
+          selectInput("hm_dist_method", NULL,
+            choices=c("Bray-Curtis"="bray","Euclidean"="euclidean","Manhattan"="manhattan","Canberra"="canberra"),
+            selected="bray")
+        )
+      )
+    } else if (startsWith(pt, "heatmap_")) {
+      db_key     <- toupper(sub("^heatmap_", "", pt))
+      fun_counts <- if (!is.null(sqm_data())) available_func_counts(sqm_data(), db_key) else c("Copy number"="copy_number")
+      tagList(
+        tags$div(class="sidebar-box",
+          tags$div(class="form-label","Count type"),
+          selectInput("hm_func_count", NULL, choices=fun_counts,
+            selected=if("copy_number"%in%fun_counts)"copy_number" else fun_counts[[1]]),
+          tags$div(class="form-label",style="margin-top:4px;","No. of features (top N)"),
+          numericInput("hm_n_features", NULL, value=30, min=2, max=500, step=1)
+        ),
+        tags$div(class="sidebar-box",style="margin-top:8px;",
+          tags$div(class="form-label","Clustering method"),
+          selectInput("hm_clust_method", NULL,
+            choices=c("Ward D2"="ward.D2","Complete"="complete","Average"="average","Single"="single"),
+            selected="ward.D2"),
+          tags$div(class="form-label",style="margin-top:4px;","Distance metric"),
+          selectInput("hm_dist_method", NULL,
+            choices=c("Bray-Curtis"="bray","Euclidean"="euclidean","Manhattan"="manhattan","Canberra"="canberra"),
+            selected="bray")
         )
       )
     } else NULL
@@ -2326,12 +2423,22 @@ server <- function(input, output, session) {
   })
   output$sqm_plot_ui <- renderUI({
     pt <- input$plot_type
-    is_tax  <- !is.null(pt) && pt=="taxonomy_bar"
-    is_func <- !is.null(pt) && pt %in% c("func_cog","func_kegg","func_pfam")
-    h <- if(is_tax) input$tax_plot_height %||% 560 else if(is_func) input$func_plot_height %||% 560 else 560
-    w <- if(is_tax) input$tax_plot_width  %||% 800 else if(is_func) input$func_plot_width  %||% 800 else NULL
-    style <- if(!is.null(w)) paste0("width:",w,"px; overflow-x:auto;") else "width:100%;"
-    if (is_func) {
+    is_tax     <- !is.null(pt) && pt == "taxonomy_bar"
+    is_func    <- !is.null(pt) && pt %in% c("func_cog","func_kegg","func_pfam")
+    is_heatmap <- !is.null(pt) && (pt == "taxonomy_heatmap" || startsWith(pt, "heatmap_"))
+    h <- if (is_tax)     input$tax_plot_height %||% 560
+         else if (is_func)    input$func_plot_height %||% 560
+         else if (is_heatmap) input$hm_plot_height   %||% 600
+         else 560
+    w <- if (is_tax)  input$tax_plot_width  %||% 800
+         else if (is_func)    input$func_plot_width  %||% 800
+         else if (is_heatmap) input$hm_plot_width    %||% 800
+         else NULL
+    style <- if (!is.null(w)) paste0("width:",w,"px; overflow-x:auto;") else "width:100%;"
+    if (is_heatmap) {
+      tags$div(style="width:100%; overflow-x:auto;",
+        plotlyOutput("sqm_heatmap_plot", width="100%", height=paste0(h,"px")))
+    } else if (is_func) {
       tags$div(style="width:100%; overflow-x:auto;",
         plotlyOutput("sqm_func_plot", width="100%", height=paste0(h,"px")))
     } else if (is_tax) {
@@ -2673,6 +2780,117 @@ server <- function(input, output, session) {
   })
 
   output$sqm_func_plot <- renderPlotly({ func_plot_reactive() })
+
+  # ── Clustered heatmap reactive ───────────────────────────────────────────────
+  heatmap_plot_reactive <- reactive({
+    req(sqm_data()); proj <- sqm_data(); pt <- input$plot_type
+    req(!is.null(pt) && (pt == "taxonomy_heatmap" || startsWith(pt, "heatmap_")))
+    fs           <- input$hm_font_size    %||% 10
+    pw           <- input$hm_plot_width   %||% 800
+    ph           <- input$hm_plot_height  %||% 600
+    pal          <- input$hm_palette      %||% "Blues"
+    scl          <- input$hm_scale        %||% "log"
+    n            <- input$hm_n_features   %||% 30
+    clust_method <- input$hm_clust_method %||% "ward.D2"
+    dist_method  <- input$hm_dist_method  %||% "bray"
+
+    # Subset samples
+    all_smp <- tryCatch(proj$misc$samples, error=function(e) NULL)
+    sel_smp <- input$plot_samples
+    if (!is.null(all_smp) && !is.null(sel_smp) && length(sel_smp) > 0 &&
+        !setequal(sel_smp, all_smp))
+      proj <- tryCatch(subsetSamples(proj, sel_smp), error=function(e) proj)
+
+    # Get features x samples matrix
+    mat <- if (pt == "taxonomy_heatmap") {
+      rank  <- input$hm_tax_rank  %||% "phylum"
+      count <- input$hm_tax_count %||% "percent"
+      tryCatch(as.matrix(proj$taxa[[rank]][[count]]), error=function(e) NULL)
+    } else {
+      db    <- toupper(sub("^heatmap_", "", pt))
+      count <- input$hm_func_count %||% "copy_number"
+      tryCatch(as.matrix(proj$functions[[db]][[count]]), error=function(e) NULL)
+    }
+    req(!is.null(mat) && nrow(mat) > 1 && ncol(mat) > 0)
+    mat[is.na(mat)] <- 0
+
+    # Keep top N features by total abundance
+    if (nrow(mat) > n) {
+      top_idx <- order(rowSums(mat, na.rm=TRUE), decreasing=TRUE)[seq_len(n)]
+      mat <- mat[top_idx, , drop=FALSE]
+    }
+
+    # Apply scaling
+    mat_scaled <- switch(scl,
+      log = log10(mat + 1),
+      zscore_row = {
+        t(apply(mat, 1, function(r) {
+          s <- sd(r, na.rm=TRUE)
+          if (is.na(s) || s == 0) r - mean(r, na.rm=TRUE) else (r - mean(r, na.rm=TRUE)) / s
+        }))
+      },
+      zscore_col = {
+        apply(mat, 2, function(r) {
+          s <- sd(r, na.rm=TRUE)
+          if (is.na(s) || s == 0) r - mean(r, na.rm=TRUE) else (r - mean(r, na.rm=TRUE)) / s
+        })
+      },
+      mat
+    )
+
+    # Helper: safe distance + clustering
+    safe_clust <- function(m, dist_m, clust_m) {
+      tryCatch({
+        d <- if (dist_m == "bray") vegan::vegdist(m, method="bray")
+             else dist(m, method=dist_m)
+        hclust(d, method=clust_m)
+      }, error=function(e) NULL)
+    }
+
+    # Cluster rows (features) and columns (samples)
+    # Bray-Curtis requires non-negative values; fall back to euclidean if scaled
+    dist_use <- if (dist_method == "bray" && scl %in% c("zscore_row","zscore_col")) "euclidean" else dist_method
+    hc_rows <- safe_clust(mat_scaled,   dist_use, clust_method)
+    hc_cols <- safe_clust(t(mat_scaled), dist_use, clust_method)
+
+    row_ord <- if (!is.null(hc_rows)) hc_rows$order else seq_len(nrow(mat_scaled))
+    col_ord <- if (!is.null(hc_cols)) hc_cols$order else seq_len(ncol(mat_scaled))
+    mat_ord <- mat_scaled[row_ord, col_ord, drop=FALSE]
+
+    # Colorscale label for plotly
+    colorscale_name <- switch(pal,
+      Blues="Blues", Viridis="Viridis", RdBu="RdBu", YlOrRd="YlOrRd",
+      RdYlBu="RdYlBu", Portland="Portland", Plasma="Plasma", Cividis="Cividis",
+      "Blues"
+    )
+
+    # Value label for hover
+    val_label <- switch(scl,
+      log="log₁₀(x+1)", zscore_row="z-score", zscore_col="z-score", "value"
+    )
+
+    plot_ly(
+      z    = mat_ord,
+      x    = colnames(mat_ord),
+      y    = rownames(mat_ord),
+      type = "heatmap",
+      colorscale    = colorscale_name,
+      reversescale  = FALSE,
+      hovertemplate = paste0("<b>%{y}</b><br>Sample: %{x}<br>", val_label, ": %{z:.4f}<extra></extra>"),
+      width  = pw,
+      height = ph
+    ) |>
+    layout(
+      xaxis  = list(title="", tickfont=list(size=fs), tickangle=-45, automargin=TRUE),
+      yaxis  = list(title="", tickfont=list(size=fs), automargin=TRUE, autorange="reversed"),
+      margin = list(l=10, r=30, t=30, b=80),
+      paper_bgcolor = "rgba(0,0,0,0)",
+      plot_bgcolor  = "rgba(0,0,0,0)"
+    ) |>
+    config(displayModeBar=FALSE)
+  })
+  output$sqm_heatmap_plot <- renderPlotly({ heatmap_plot_reactive() })
+
   output$plot_status_badge <- renderUI({
     if (is.null(sqm_data())) tags$span(class="badge",style="background:#eef2f7;color:#7a90a8;font-size:0.72rem;border:1px solid #d0dae6;","No project")
     else tags$span(class="badge",style="background:rgba(26,158,110,0.1);color:#1a9e6e;font-size:0.72rem;border:1px solid rgba(26,158,110,0.3);","\u25cf Ready")
@@ -2680,16 +2898,23 @@ server <- function(input, output, session) {
   output$download_plot <- downloadHandler(
     filename = function() paste0("sqm_plot_",Sys.Date(),".png"),
     content  = function(file) {
-      pt <- isolate(input$plot_type)
-      is_tax  <- !is.null(pt) && pt=="taxonomy_bar"
-      is_func <- !is.null(pt) && pt %in% c("func_cog","func_kegg","func_pfam")
-      w <- if(is_tax) isolate(input$tax_plot_width  %||% 800) else if(is_func) isolate(input$func_plot_width  %||% 800) else 1400
-      h <- if(is_tax) isolate(input$tax_plot_height %||% 560) else if(is_func) isolate(input$func_plot_height %||% 560) else 900
-      if (is_tax) {
-      showNotification("Use the Plotly camera button to save taxonomy plots.", type="message", duration=5)
-    } else {
-      png(file,width=w,height=h,res=150,bg="#ffffff"); print(plot_reactive()); dev.off()
-    }
+      pt         <- isolate(input$plot_type)
+      is_tax     <- !is.null(pt) && pt == "taxonomy_bar"
+      is_func    <- !is.null(pt) && pt %in% c("func_cog","func_kegg","func_pfam")
+      is_heatmap <- !is.null(pt) && (pt == "taxonomy_heatmap" || startsWith(pt, "heatmap_"))
+      w <- if (is_tax)     isolate(input$tax_plot_width  %||% 800)
+           else if (is_func)    isolate(input$func_plot_width  %||% 800)
+           else if (is_heatmap) isolate(input$hm_plot_width    %||% 800)
+           else 1400
+      h <- if (is_tax)     isolate(input$tax_plot_height %||% 560)
+           else if (is_func)    isolate(input$func_plot_height %||% 560)
+           else if (is_heatmap) isolate(input$hm_plot_height   %||% 600)
+           else 900
+      if (is_tax || is_func || is_heatmap) {
+        showNotification("Use the Plotly camera ◷ button to save this plot.", type="message", duration=5)
+      } else {
+        png(file, width=w, height=h, res=150, bg="#ffffff"); print(plot_reactive()); dev.off()
+      }
     }
   )
   output$table_sample_filter <- renderUI({
