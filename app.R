@@ -342,7 +342,7 @@ available_plot_types <- function(proj) {
   has_tax <- any(sapply(c("phylum","class","order","family","genus","species"), function(r)
     tryCatch(has_data(proj$taxa[[r]]$percent), error = function(e) FALSE)
   ))
-  if (has_tax) choices <- c(choices, "Taxonomy" = "taxonomy_bar")
+  if (has_tax) choices <- c(choices, "Taxonomy (barplot)" = "taxonomy_bar", "Taxonomy (heatmap)" = "taxonomy_heatmap")
 
   # Functions: COG, KEGG, PFAM, and any extra databases
   all_dbs <- tryCatch(names(proj$functions), error = function(e) character(0))
@@ -1644,6 +1644,23 @@ ui <- page_navbar(
               numericInput("func_label_width", NULL, value=40, min=10, max=200, step=5, width="65px")
             )
           ),
+          # ── Format bar: taxonomy heatmap controls (hidden by default) ──
+          tags$div(id = "fmt_tax_hm",
+            style = "display:none;",
+            tags$div(
+              style = "display:flex; gap:8px; align-items:center; margin-bottom:6px; flex-wrap:wrap; padding:2px;",
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "W:"),
+              numericInput("tax_hm_width",  NULL, value=1200, min=400, max=4000, step=50, width="80px"),
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "H:"),
+              numericInput("tax_hm_height", NULL, value=560,  min=200, max=3000, step=50, width="80px"),
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "Font:"),
+              numericInput("tax_hm_font",   NULL, value=11,   min=6,   max=24,   step=1,  width="65px"),
+              tags$div(style="font-size:0.75rem; color:var(--muted); white-space:nowrap;", "Palette:"),
+              selectInput("tax_hm_palette", NULL,
+                choices  = c("Blues","Viridis","YlOrRd","RdBu","Greens","Hot","Portland","Jet"),
+                selected = "Blues", width="100px")
+            )
+          ),
           uiOutput("sqm_plot_ui")
         )
       )
@@ -1768,12 +1785,15 @@ server <- function(input, output, session) {
   observeEvent(input$plot_type, {
     pt    <- input$plot_type %||% ""
     is_fn <- startsWith(pt, "func_")
+    is_tax_hm <- pt == "taxonomy_heatmap"
     if (pt == "taxonomy_bar") {
-      shinyjs::show("fmt_tax"); shinyjs::hide("fmt_func")
+      shinyjs::show("fmt_tax"); shinyjs::hide("fmt_func"); shinyjs::hide("fmt_tax_hm")
     } else if (is_fn) {
-      shinyjs::hide("fmt_tax"); shinyjs::show("fmt_func")
+      shinyjs::hide("fmt_tax"); shinyjs::show("fmt_func"); shinyjs::hide("fmt_tax_hm")
+    } else if (is_tax_hm) {
+      shinyjs::hide("fmt_tax"); shinyjs::hide("fmt_func"); shinyjs::show("fmt_tax_hm")
     } else {
-      shinyjs::hide("fmt_tax"); shinyjs::hide("fmt_func")
+      shinyjs::hide("fmt_tax"); shinyjs::hide("fmt_func"); shinyjs::hide("fmt_tax_hm")
     }
   }, ignoreNULL = FALSE)
 
@@ -2291,6 +2311,31 @@ server <- function(input, output, session) {
           )
         ),
       )
+    } else if (pt == "taxonomy_heatmap") {
+      tax_counts  <- if (!is.null(sqm_data())) available_tax_counts(sqm_data()) else c("Percentages"="percent")
+      avail_ranks <- if (!is.null(sqm_data())) available_tax_ranks(sqm_data()) else c("Phylum"="phylum")
+      tagList(
+        tags$div(class="sidebar-box",
+          tags$div(class="form-label","Taxonomic rank"),
+          selectInput("tax_hm_rank", NULL, choices=avail_ranks),
+          tags$div(class="form-label",style="margin-top:4px;","Count type"),
+          selectInput("tax_hm_count", NULL, choices=tax_counts,
+            selected=if("percent"%in%tax_counts)"percent" else tax_counts[[1]]),
+          tags$div(class="form-label",style="margin-top:4px;","No. of taxa"),
+          numericInput("tax_hm_n", NULL, value=30, min=1, max=500, step=1),
+          tags$div(class="form-label",style="margin-top:4px;","Rescale"),
+          selectInput("tax_hm_scale", NULL,
+            choices=c("None"="none","Log₁₀(x+1)"="log","Z-score"="zscore"),
+            selected="none")
+        ),
+        tags$div(class="sidebar-box",style="margin-top:8px;",
+          tags$div(style="display:grid;grid-template-columns:1fr 1fr;gap:0;",
+            checkboxInput("tax_hm_ignore_unmapped","Ignore unmapped",value=FALSE),
+            checkboxInput("tax_hm_ignore_unclassified","Ignore unclassified",value=FALSE),
+            checkboxInput("tax_hm_ignore_ambiguous","Ignore ambiguous",value=FALSE)
+          )
+        )
+      )
     } else if (startsWith(pt, "func_")) {
       fun_label <- toupper(sub("^func_", "", pt))
       tagList(
@@ -2351,17 +2396,23 @@ server <- function(input, output, session) {
   output$sqm_plot_ui <- renderUI({
     pt <- input$plot_type
     is_tax     <- !is.null(pt) && pt == "taxonomy_bar"
+    is_tax_hm  <- !is.null(pt) && pt == "taxonomy_heatmap"
     is_func    <- !is.null(pt) && startsWith(pt, "func_")
-    h <- if (is_tax)  input$tax_plot_height %||% 560
-         else if (is_func) input$func_plot_height %||% 560
+    h <- if (is_tax)     input$tax_plot_height %||% 560
+         else if (is_func)   input$func_plot_height %||% 560
+         else if (is_tax_hm) input$tax_hm_height   %||% 560
          else 560
-    w <- if (is_tax)  input$tax_plot_width  %||% 800
-         else if (is_func) input$func_plot_width  %||% 1200
+    w <- if (is_tax)     input$tax_plot_width  %||% 800
+         else if (is_func)   input$func_plot_width  %||% 1200
+         else if (is_tax_hm) input$tax_hm_width    %||% 1200
          else NULL
     style <- if (!is.null(w)) paste0("width:",w,"px; overflow-x:auto;") else "width:100%;"
-    if (is_func) {
-      tags$div(style="width:100%; overflow-x:auto;",
-        plotlyOutput("sqm_func_plot", width="100%", height=paste0(h,"px")))
+    if (is_tax_hm) {
+      tags$div(style="width:100%; overflow-x:auto; overflow-y:auto; max-height:80vh;",
+        plotlyOutput("sqm_tax_hm_plot", width="100%", height="auto"))
+    } else if (is_func) {
+      tags$div(style="width:100%; overflow-x:auto; overflow-y:auto; max-height:80vh;",
+        plotlyOutput("sqm_func_plot", width="100%", height="auto"))
     } else if (is_tax) {
       tags$div(style="width:100%; overflow-x:auto;",
         plotlyOutput("sqm_tax_plot", width="100%", height=paste0(h,"px")))
@@ -2406,6 +2457,8 @@ server <- function(input, output, session) {
     }
     if (pt=="taxonomy_bar") {
       return(NULL)  # handled by tax_plot_reactive / sqm_tax_plot
+    } else if (pt=="taxonomy_heatmap") {
+      return(NULL)  # handled by tax_hm_reactive / sqm_tax_hm_plot
     } else if (startsWith(pt, "func_")) {
       return(NULL)  # handled by func_plot_reactive / sqm_func_plot
     } else if (pt=="bins") { plotBins(proj) }
@@ -2636,7 +2689,14 @@ server <- function(input, output, session) {
     req(nrow(mat) > 0)
 
 
-    # Apply rescaling
+    # Compute order on raw values BEFORE scaling (stable order regardless of rescale)
+    n_funcs <- min(input$n_funcs %||% 20, nrow(mat))
+    row_totals <- rowSums(mat, na.rm=TRUE)
+    top_idx <- order(row_totals, decreasing=TRUE)[seq_len(n_funcs)]
+    mat <- mat[top_idx, , drop=FALSE]
+    row_order <- order(rowSums(mat, na.rm=TRUE), decreasing=TRUE)
+
+    # Apply rescaling after order is fixed
     scl <- input$plot_scale %||% "none"
     if (scl == "log") {
       mat <- log10(mat + 1)
@@ -2646,11 +2706,7 @@ server <- function(input, output, session) {
         if (is.na(s) || s == 0) r - mean(r, na.rm=TRUE) else (r - mean(r, na.rm=TRUE)) / s
       }))
     }
-    # Take top N by total abundance
-    n_funcs <- min(input$n_funcs %||% 20, nrow(mat))
-    row_totals <- rowSums(mat, na.rm=TRUE)
-    top_idx <- order(row_totals, decreasing=TRUE)[seq_len(n_funcs)]
-    mat <- mat[top_idx, , drop=FALSE]
+    mat <- mat[row_order, , drop=FALSE]
 
     # Enrich row names with function names if available
     fun_names <- tryCatch(proj$misc[[paste0(fun_level,"_names")]], error=function(e) NULL)
@@ -2682,11 +2738,9 @@ server <- function(input, output, session) {
     }
     rownames(mat) <- sapply(rownames(mat), wrap_label, USE.NAMES=FALSE)
 
-    # Order rows by total (top at top of heatmap)
-    mat <- mat[order(rowSums(mat, na.rm=TRUE), decreasing=TRUE), , drop=FALSE]
-
     pw <- input$func_plot_width  %||% 1200
-    ph <- input$func_plot_height %||% 560
+    # Fix height so cell size is consistent (28px/row + overhead)
+    ph <- nrow(mat) * 28 + 120
 
     # Build plotly heatmap with Blues colorscale
     p <- plot_ly(
@@ -2713,6 +2767,74 @@ server <- function(input, output, session) {
 
   output$sqm_func_plot <- renderPlotly({ func_plot_reactive() })
 
+  # ── Taxonomy heatmap reactive ──
+  tax_hm_reactive <- reactive({
+    req(sqm_data()); proj <- sqm_data()
+    req(input$plot_type == "taxonomy_heatmap")
+
+    all_smp <- tryCatch(proj$misc$samples, error=function(e) NULL)
+    sel_smp <- input$plot_samples
+    if (!is.null(all_smp) && !is.null(sel_smp) && length(sel_smp) > 0 &&
+        !setequal(sel_smp, all_smp))
+      proj <- tryCatch(subsetSamples(proj, sel_smp), error=function(e) proj)
+
+    rank  <- input$tax_hm_rank  %||% "phylum"
+    count <- input$tax_hm_count %||% "percent"
+    mat   <- tryCatch(as.matrix(proj$taxa[[rank]][[count]]), error=function(e) NULL)
+    req(!is.null(mat) && nrow(mat) > 0)
+
+    # Filters
+    mat <- mat[rowSums(mat, na.rm=TRUE) > 0, , drop=FALSE]
+    mat <- mat[!grepl("^[Nn]o CDS$", rownames(mat)), , drop=FALSE]
+    if (isTRUE(input$tax_hm_ignore_unmapped))
+      mat <- mat[!grepl("^[Uu]nmapped$|^[Nn]o [Hh]it", rownames(mat)), , drop=FALSE]
+    if (isTRUE(input$tax_hm_ignore_unclassified))
+      mat <- mat[!grepl("^[Uu]nclassified$", rownames(mat)), , drop=FALSE]
+    if (isTRUE(input$tax_hm_ignore_ambiguous))
+      mat <- mat[!grepl("^[Uu]nclassified ", rownames(mat)), , drop=FALSE]
+    req(nrow(mat) > 0)
+
+    # Compute order on raw values BEFORE scaling (stable order regardless of rescale)
+    n <- min(input$tax_hm_n %||% 30, nrow(mat))
+    top_idx <- order(rowSums(mat, na.rm=TRUE), decreasing=TRUE)[seq_len(n)]
+    mat <- mat[top_idx, , drop=FALSE]
+    row_order <- order(rowSums(mat, na.rm=TRUE), decreasing=TRUE)
+
+    # Apply rescaling after order is fixed
+    tax_hm_scl <- input$tax_hm_scale %||% "none"
+    if (tax_hm_scl == "log") {
+      mat <- log10(mat + 1)
+    } else if (tax_hm_scl == "zscore") {
+      mat <- t(apply(mat, 1, function(r) {
+        s <- sd(r, na.rm=TRUE)
+        if (is.na(s) || s == 0) r - mean(r, na.rm=TRUE) else (r - mean(r, na.rm=TRUE)) / s
+      }))
+    }
+    mat <- mat[row_order, , drop=FALSE]
+
+    pw <- input$tax_hm_width  %||% 1200
+    fs <- input$tax_hm_font   %||% 11
+    # Compute height so row size matches func heatmaps (~28px/row + margins)
+    # Fix height so cell size matches func heatmaps (28px/row + overhead)
+    ph <- nrow(mat) * 28 + 120
+
+    p <- plot_ly(
+      z=mat, x=colnames(mat), y=rownames(mat),
+      type="heatmap", colorscale=input$tax_hm_palette %||% "Blues",
+      reversescale=FALSE,
+      hovertemplate="<b>%{y}</b><br>Sample: %{x}<br>Value: %{z:.4f}<extra></extra>",
+      width=pw, height=ph
+    )
+    p <- layout(p,
+      xaxis  = list(title="", tickfont=list(size=fs), tickangle=-45, automargin=TRUE),
+      yaxis  = list(title="", tickfont=list(size=fs), automargin=TRUE, autorange="reversed"),
+      margin = list(l=10, r=10, t=30, b=60),
+      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+    )
+    config(p, displayModeBar=FALSE)
+  })
+  output$sqm_tax_hm_plot <- renderPlotly({ tax_hm_reactive() })
+
   # ── Helper: extract hclust dendrogram as segment coordinates ──────────────
   # Returns data.frame(x0,y0,x1,y1). Leaf x-positions are integers 1..n
   # matching the left-to-right order of hc$order.
@@ -2728,14 +2850,17 @@ server <- function(input, output, session) {
     content  = function(file) {
       pt         <- isolate(input$plot_type)
       is_tax     <- !is.null(pt) && pt == "taxonomy_bar"
+      is_tax_hm  <- !is.null(pt) && pt == "taxonomy_heatmap"
       is_func    <- !is.null(pt) && startsWith(pt, "func_")
-      w <- if (is_tax)  isolate(input$tax_plot_width  %||% 800)
-           else if (is_func) isolate(input$func_plot_width  %||% 800)
+      w <- if (is_tax)     isolate(input$tax_plot_width  %||% 800)
+           else if (is_func)   isolate(input$func_plot_width  %||% 1200)
+           else if (is_tax_hm) isolate(input$tax_hm_width    %||% 1200)
            else 1400
-      h <- if (is_tax)  isolate(input$tax_plot_height %||% 560)
-           else if (is_func) isolate(input$func_plot_height %||% 560)
+      h <- if (is_tax)     isolate(input$tax_plot_height %||% 560)
+           else if (is_func)   isolate(input$func_plot_height %||% 560)
+           else if (is_tax_hm) isolate(input$tax_hm_height   %||% 560)
            else 900
-      if (is_tax || is_func) {
+      if (is_tax || is_func || is_tax_hm) {
         showNotification("Use the Plotly camera ◷ button to save this plot.", type="message", duration=5)
       } else {
         png(file, width=w, height=h, res=150, bg="#ffffff"); print(plot_reactive()); dev.off()
