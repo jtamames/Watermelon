@@ -2306,7 +2306,11 @@ server <- function(input, output, session) {
         uiOutput("func_category_ui"),
         tags$div(class="sidebar-box",style="margin-top:8px;",
           tags$div(class="form-label","Count type"), uiOutput("func_count_ui"),
-          tags$div(class="form-label",style="margin-top:4px;","No. of functions"), numericInput("n_funcs", NULL, value=20, min=1, max=500, step=1)
+          tags$div(class="form-label",style="margin-top:4px;","No. of functions"), numericInput("n_funcs", NULL, value=20, min=1, max=500, step=1),
+          tags$div(class="form-label",style="margin-top:4px;","Rescale"),
+          selectInput("plot_scale", NULL,
+            choices=c("None"="none","Log₁₀(x+1)"="log","Z-score"="zscore"),
+            selected="none")
         ),
       )
     } else NULL
@@ -2352,7 +2356,7 @@ server <- function(input, output, session) {
          else if (is_func) input$func_plot_height %||% 560
          else 560
     w <- if (is_tax)  input$tax_plot_width  %||% 800
-         else if (is_func) input$func_plot_width  %||% 800
+         else if (is_func) input$func_plot_width  %||% 1200
          else NULL
     style <- if (!is.null(w)) paste0("width:",w,"px; overflow-x:auto;") else "width:100%;"
     if (is_func) {
@@ -2631,6 +2635,17 @@ server <- function(input, output, session) {
     mat <- mat[keep_rows, , drop=FALSE]
     req(nrow(mat) > 0)
 
+
+    # Apply rescaling
+    scl <- input$plot_scale %||% "none"
+    if (scl == "log") {
+      mat <- log10(mat + 1)
+    } else if (scl == "zscore") {
+      mat <- t(apply(mat, 1, function(r) {
+        s <- sd(r, na.rm=TRUE)
+        if (is.na(s) || s == 0) r - mean(r, na.rm=TRUE) else (r - mean(r, na.rm=TRUE)) / s
+      }))
+    }
     # Take top N by total abundance
     n_funcs <- min(input$n_funcs %||% 20, nrow(mat))
     row_totals <- rowSums(mat, na.rm=TRUE)
