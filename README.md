@@ -5,7 +5,7 @@ Interactive Shiny dashboard for visualizing and exploring [SqueezeMeta](https://
 ## Features
 
 - **Project** — loads SQM (full) and SQMlite projects, displays a structured summary including reads, contigs, ORFs, taxonomy coverage and most abundant taxa
-- **Plots** — interactive barplots for taxonomy (all ranks) and functions (COG, KEGG, PFAM, external DBs), with search, count type selection, and adjustable size/font; bins barplot
+- **Plots** — interactive barplots and heatmaps for taxonomy (all ranks) and functions (COG, KEGG, PFAM, external DBs), with search, count type selection, rescaling options, and adjustable size/font; bins barplot
 - **Tables** — browsable, downloadable tables for assembly (contigs, ORFs), taxonomy (all ranks), functions (COG, KEGG, PFAM, external DBs) and bins; multiple metrics; COG and KEGG tables include Name and Path annotation columns
 - **Krona** — generates and displays interactive Krona taxonomy charts inline, with per-sample filtering and HTML download
 - **Pathways** — overlays functional abundance data onto KEGG pathway maps using `exportPathway` from SQMtools; supports per-sample coloring, log scale, fold-change between sample groups, and hierarchical pathway browser with search
@@ -65,14 +65,11 @@ install.packages(
 )
 ```
 
-### plotly, ggplot2, gridExtra (optional, required for Plots tab)
+### plotly (required for Plots tab)
 
 ```r
-install.packages(c("plotly", "ggplot2", "gridExtra", "gtable", "RColorBrewer", "viridisLite", "pheatmap", "heatmaply"))
+install.packages("plotly")
 ```
-
-- `plotly` — interactive barplots (taxonomy, functions)
-- `pheatmap` + `RColorBrewer` + `viridisLite` — clustered heatmaps with dendrograms
 
 ### vegan (optional, required for Multivariate tab)
 
@@ -190,15 +187,40 @@ If the tables directory cannot be detected automatically, a manual directory sel
 Displays a structured summary of the loaded project: sample list, read counts, contig and ORF statistics, taxonomic classification coverage, most abundant taxa per rank.
 
 ### Plots
-Select a plot type from the sidebar:
-- **Taxonomy (barplot)** — choose rank, count type, number of taxa; optionally search for specific taxa (SQM full only)
-- **COG / KEGG / PFAM functions** — heatmap of most abundant functions; optionally search by ID or keyword
-- **Binning** — barplot of most abundant bins
 
-All plots support adjustable width, height and font size. Changes apply immediately. Use **Download PNG** to export.
+Select a plot type from the sidebar. Available types depend on the data present in the loaded project.
+
+**Taxonomy (barplot)** — stacked barplot of the most abundant taxa at the selected rank.
+
+- Choose rank (Phylum → Species), count type, and number of taxa
+- Optionally search for specific taxa by name (SQM full only); comma-separated, empty means top N
+- Filter options: Ignore unmapped, Ignore unclassified, Ignore ambiguous, Rescale to 100%
+- Format controls (top bar): width, height, font size, colour palette, label width
+
+**Taxonomy (heatmap)** — interactive heatmap of the most abundant taxa.
+
+- Same rank, count type and number of taxa selectors as the barplot
+- Filter options: Ignore unmapped, Ignore unclassified, Ignore ambiguous
+- Rescale selector in the sidebar: None, Log₁₀(x+1), Z-score — row order is always computed on raw values and stays stable when rescaling
+- Format controls (top bar): width, height, font size, colour palette
+- Hover to see exact values; row height is fixed at 28 px/taxon for consistent cell size
+
+**COG / KEGG / PFAM / external databases** — interactive heatmap of the most abundant functions.
+
+- Search by function ID or keyword; comma-separated, empty means top N
+- Optional category filter (COG category or KEGG hierarchy) where available
+- Count type, number of functions and rescale (None, Log₁₀(x+1), Z-score) selectors in the sidebar
+- Row order is computed on raw values and stays stable when rescaling
+- Format controls (top bar): width, height, font size, colour palette, label width
+- Hover to see function name, sample and exact value; full function names shown in row labels (truncated at 80 characters)
+
+**Binning** — barplot of bin abundances (SQM full only).
+
+All plots support a **sample selector** to restrict the analysis to a subset of samples. Use the **Download PNG** button to export (for plotly-based plots, use the camera button in the plot toolbar instead).
 
 ### Tables
 Four independent category selectors:
+
 - **Assembly** — Contigs table, ORFs table (SQM full only)
 - **Taxonomy** — select rank and metric (percentages, raw abundances)
 - **Functions** — select database and metric (raw abundances, percentages, base counts, CPM, TPM, copy number); COG and KEGG tables include Name and Path annotation columns
@@ -257,27 +279,20 @@ Ordination analysis on taxonomy or functional abundance data. Requires the `vega
 
 ## Dependencies summary
 
-| Package | Source | Required |
-|---------|--------|----------|
-| shiny | CRAN | Yes |
-| shinyjs | CRAN | Yes |
-| shinyFiles | CRAN | Yes |
-| bslib | CRAN | Yes |
-| DT | CRAN | Yes |
-| SQMtools | CRAN / SqueezeMeta repo | Yes |
-| pandoc | conda-forge / system | Yes (needed by DT in conda envs) |
-| plotly | CRAN | Plots tab (barplots) |
-| ggplot2 | CRAN | Plots tab (clustered heatmaps) |
-| gridExtra | CRAN | Plots tab (clustered heatmaps) |
-| gtable | CRAN | Plots tab (clustered heatmaps) |
-| RColorBrewer | CRAN | Plots tab (clustered heatmaps) |
-| viridisLite | CRAN | Plots tab (clustered heatmaps) |
-| pheatmap | CRAN | Plots tab (clustered heatmaps) |
-| heatmaply | CRAN | Plots tab (clustered heatmaps, interactive hover) |
-| vegan | CRAN | Multivariate tab only |
-| pathview | Bioconductor | Pathways tab only |
-| KEGGREST | Bioconductor (auto-installed with pathview) | Pathways tab only |
-| KronaTools (`ktImportText`) | conda / GitHub | Krona tab only |
+| Package | Source | Required for |
+|---------|--------|--------------|
+| shiny | CRAN | Core |
+| shinyjs | CRAN | Core |
+| shinyFiles | CRAN | Core |
+| bslib | CRAN | Core |
+| DT | CRAN | Core |
+| SQMtools | CRAN / SqueezeMeta repo | Core |
+| plotly | CRAN | Plots tab |
+| pandoc | conda-forge / system | Needed by DT in conda envs |
+| vegan | CRAN | Multivariate tab |
+| pathview | Bioconductor | Pathways tab |
+| KEGGREST | Bioconductor (auto with pathview) | Pathways tab |
+| KronaTools (`ktImportText`) | conda / GitHub | Krona tab |
 
 ---
 
@@ -290,7 +305,7 @@ This section explains how to make SQMxplore accessible to remote users via **Shi
 All packages must be installed as root so Shiny Server can find them:
 
 ```bash
-sudo R -e "install.packages(c('shiny','shinyjs','shinyFiles','bslib','DT','plotly','ggplot2','gridExtra','gtable','RColorBrewer','viridisLite','pheatmap','heatmaply','SQMtools','vegan'), repos='https://cran.rstudio.com/')"
+sudo R -e "install.packages(c('shiny','shinyjs','shinyFiles','bslib','DT','plotly','SQMtools','vegan'), repos='https://cran.rstudio.com/')"
 
 # Optional: pathview
 sudo R -e "if (!require('BiocManager', quietly=TRUE)) install.packages('BiocManager'); BiocManager::install('pathview')"
