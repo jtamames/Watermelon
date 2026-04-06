@@ -2813,6 +2813,7 @@ server <- function(input, output, session) {
       type      = "heatmap",
       colorscale = input$func_palette %||% "Blues",
       reversescale = FALSE,
+      colorbar = list(lenmode="pixels", len=200, thickness=15),
       hovertemplate = "<b>%{y}</b><br>Sample: %{x}<br>Value: %{z}<extra></extra>",
       width     = pw,
       height    = ph
@@ -2928,6 +2929,7 @@ server <- function(input, output, session) {
       type          = "heatmap",
       colorscale    = input$func_palette %||% "Blues",
       reversescale  = FALSE,
+      colorbar      = list(lenmode="pixels", len=200, thickness=15),
       hovertemplate = "<b>%{y}</b><br>Sample: %{x}<br>Value: %{z:.4f}<extra></extra>",
       width = pw, height = ph
     )
@@ -3097,6 +3099,7 @@ server <- function(input, output, session) {
       z=mat, x=colnames(mat), y=rownames(mat),
       type="heatmap", colorscale=input$func_palette %||% "Blues",
       reversescale=FALSE,
+      colorbar=list(lenmode="pixels", len=200, thickness=15),
       hovertemplate="<b>%{y}</b><br>Sample: %{x}<br>Value: %{z:.4f}<extra></extra>",
       width=pw, height=ph
     )
@@ -3165,6 +3168,7 @@ server <- function(input, output, session) {
       z=mat, x=colnames(mat), y=rownames(mat),
       type="heatmap", colorscale=input$tax_hm_palette %||% "Blues",
       reversescale=FALSE,
+      colorbar=list(lenmode="pixels", len=200, thickness=15),
       hovertemplate="<b>%{y}</b><br>Sample: %{x}<br>Value: %{z:.4f}<extra></extra>",
       width=pw, height=ph
     )
