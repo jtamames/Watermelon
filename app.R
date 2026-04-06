@@ -2968,8 +2968,18 @@ server <- function(input, output, session) {
     # Build a weight table: for each (KO, category) pair, weight = 1 / n_categories_of_that_KO
     # This distributes reads proportionally across all categories a KO belongs to,
     # so totals remain additive and L1 = sum of its L2 = sum of its L3.
-    kc <- KEGG_CATEGORIES[!is.na(KEGG_CATEGORIES[[level]]) &
-                           nchar(trimws(KEGG_CATEGORIES[[level]])) > 0, ]
+    # Exclude unwanted L1 categories and all their L2/L3 descendants
+    kegg_excl_l1 <- tolower(c("Brite Hierarchies",
+                               "Not included in pathway or brite",
+                               "Not included in pathway",
+                               "Human Diseases", "Organismal Systems"))
+    kc_all <- KEGG_CATEGORIES[!is.na(KEGG_CATEGORIES$l1) &
+                               !tolower(KEGG_CATEGORIES$l1) %in% kegg_excl_l1, ]
+    # Also exclude specific L2 categories and their L3 descendants
+    kegg_excl_l2 <- tolower(c("Cellular community - Eukaryotes"))
+    kc_all <- kc_all[is.na(kc_all$l2) | !tolower(kc_all$l2) %in% kegg_excl_l2, ]
+
+    kc <- kc_all[!is.na(kc_all[[level]]) & nchar(trimws(kc_all[[level]])) > 0, ]
     kc <- kc[kc$id %in% rownames(abund_raw), ]
     req(nrow(kc) > 0)
 
