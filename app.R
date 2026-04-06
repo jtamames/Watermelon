@@ -2345,7 +2345,8 @@ server <- function(input, output, session) {
       )
     } else if (pt == "kegg_class") {
       tagList(
-        tags$div(class="sidebar-box",
+        uiOutput("func_category_ui"),
+        tags$div(class="sidebar-box", style="margin-top:8px;",
           tags$div(class="form-label","Hierarchy level"),
           selectInput("kegg_class_level", NULL,
             choices  = c("L1 (broad categories)"="l1",
@@ -2354,12 +2355,18 @@ server <- function(input, output, session) {
             selected = "l1"),
           tags$div(class="form-label",style="margin-top:4px;","Count type"),
           selectInput("kegg_class_count", NULL,
-            choices  = c("Raw abundances"="abund", "Percentages"="percent", "TPM"="tpm"),
+            choices  = c("Raw abundances"="abund",
+                         "Percentage (selection)"="percent_sel",
+                         "Percentage (full dataset)"="percent_full",
+                         "TPM (selection)"="tpm_sel",
+                         "TPM (full dataset)"="tpm_full"),
             selected = "abund"),
           tags$div(class="form-label",style="margin-top:4px;","Rescale"),
           selectInput("plot_scale", NULL,
             choices=c("None"="none","Log₁₀(x+1)"="log","Z-score"="zscore"),
-            selected="none")
+            selected="none"),
+          tags$div(style="margin-top:6px;"),
+          checkboxInput("kegg_class_show_other", "Show 'Other functions'", value=FALSE)
         )
       )
     } else if (pt == "cog_class") {
@@ -2368,7 +2375,9 @@ server <- function(input, output, session) {
         tags$div(class="sidebar-box",
           tags$div(class="form-label","Count type"),
           selectInput("cog_class_count", NULL,
-            choices  = c("Raw abundances"="abund", "Percentages"="percent", "TPM"="tpm"),
+            choices  = c("Raw abundances"="abund",
+                         "Percentage"="percent_full",
+                         "TPM"="tpm_full"),
             selected = "abund"),
           tags$div(class="form-label",style="margin-top:4px;"),
           checkboxInput("cog_class_excl_unknown", "Exclude 'Function unknown'", value=FALSE),
@@ -2490,7 +2499,7 @@ server <- function(input, output, session) {
         if (is.matrix(m) || is.data.frame(m))
           proj$functions$COG[[db]] <- m[rownames(m) %in% keep, , drop=FALSE]
       }
-    } else if (pt == "func_kegg" && !is.null(KEGG_CATEGORIES)) {
+    } else if ((pt == "func_kegg" || pt == "kegg_class") && !is.null(KEGG_CATEGORIES)) {
       sel_l1 <- input$kegg_cat_l1 %||% ""
       sel_l2 <- input$kegg_cat_l2 %||% ""
       if (nchar(sel_l1) > 0) {
@@ -2692,7 +2701,7 @@ server <- function(input, output, session) {
         if (is.matrix(m) || is.data.frame(m))
           proj$functions$COG[[db]] <- m[rownames(m) %in% keep, , drop=FALSE]
       }
-    } else if (pt == "func_kegg" && !is.null(KEGG_CATEGORIES)) {
+    } else if ((pt == "func_kegg" || pt == "kegg_class") && !is.null(KEGG_CATEGORIES)) {
       sel_l1 <- input$kegg_cat_l1 %||% ""
       sel_l2 <- input$kegg_cat_l2 %||% ""
       if (nchar(sel_l1) > 0) {
@@ -2862,38 +2871,26 @@ server <- function(input, output, session) {
     }))
     rownames(agg_raw) <- cats
 
-    # Derive requested metric from aggregated raw counts
-    mat <- if (count == "percent") {
-      col_sums <- colSums(agg_raw, na.rm=TRUE)
-      col_sums[col_sums == 0] <- 1
-      sweep(agg_raw, 2, col_sums, "/") * 100
-    } else if (count == "tpm") {
-      # TPM = (reads_cat / mean_length_cat_kb) / sum(reads_i / mean_length_i_kb) * 1e6
-      # Mean gene length per category comes from proj$orfs$table ("Length NT" column)
-      orf_tbl <- tryCatch(proj$orfs$table, error=function(e) NULL)
-      if (!is.null(orf_tbl)) {
-        # Identify COG ID column (may be "COG ID", "COG.ID", etc.)
-        cog_col <- grep("^COG", colnames(orf_tbl), value=TRUE)[1]
-        len_col <- grep("[Ll]ength.*[Nn][Tt]|[Nn][Tt].*[Ll]ength|^Length$", colnames(orf_tbl), value=TRUE)[1]
-        if (!is.null(cog_col) && !is.null(len_col)) {
-          orf_cog <- as.character(orf_tbl[[cog_col]])
-          orf_len <- as.numeric(orf_tbl[[len_col]])
-          # Mean length in kb per COG class
-          mean_len_kb <- sapply(cats, function(cat) {
-            cog_ids_in_cat <- COG_CATEGORIES$id[COG_CATEGORIES$category == cat]
-            lens <- orf_len[orf_cog %in% cog_ids_in_cat]
-            if (length(lens) == 0 || all(is.na(lens))) return(1)
-            mean(lens, na.rm=TRUE) / 1000
-          })
-          mean_len_kb[mean_len_kb == 0] <- 1
-          # RPK per category per sample
-          rpk <- agg_raw / mean_len_kb
-          # Normalize to TPM
-          rpk_sums <- colSums(rpk, na.rm=TRUE)
-          rpk_sums[rpk_sums == 0] <- 1
-          sweep(rpk, 2, rpk_sums, "/") * 1e6
-        } else agg_raw
-      } else agg_raw
+    # For "full dataset" metrics: aggregate the precomputed per-gene values from SQMtools
+    # This avoids recalculating and is consistent with what SQMtools already computed.
+    agg_precomputed <- function(metric_name) {
+      mat_gene <- tryCatch(as.matrix(proj$functions[[cog_db]][[metric_name]]), error=function(e) NULL)
+      if (is.null(mat_gene)) return(agg_raw)
+      mat_gene <- mat_gene[rownames(mat_gene) %in% rownames(abund_raw), , drop=FALSE]
+      cv_sub   <- cat_vec[match(rownames(mat_gene), rownames(abund_raw))]
+      do.call(rbind, lapply(cats, function(cat) {
+        rows <- which(cv_sub == cat)
+        if (length(rows) == 0) return(matrix(0, 1, ncol(mat_gene)))
+        if (length(rows) == 1) mat_gene[rows, , drop=FALSE]
+        else colSums(mat_gene[rows, , drop=FALSE], na.rm=TRUE)
+      }))
+    }
+
+    # Derive requested metric
+    mat <- if (count == "percent_full") {
+      agg_precomputed("percent")
+    } else if (count == "tpm_full") {
+      agg_precomputed("tpm")
     } else {
       agg_raw   # raw abundances
     }
@@ -2981,6 +2978,25 @@ server <- function(input, output, session) {
 
     kc <- kc_all[!is.na(kc_all[[level]]) & nchar(trimws(kc_all[[level]])) > 0, ]
     kc <- kc[kc$id %in% rownames(abund_raw), ]
+
+    # Identify "other" KOs: in abund_raw but not in any kept category at this level
+    # This includes: KOs from excluded L1/L2, KOs with no KEGG category at all
+    other_ids <- setdiff(rownames(abund_raw), unique(kc$id))
+    other_abund <- if (length(other_ids) > 0)
+      colSums(abund_raw[other_ids, , drop=FALSE], na.rm=TRUE)
+    else NULL
+
+    # Keep kc_full reference for "full dataset" precomputed aggregation
+    kc_full <- kc
+
+    # Apply optional category filter (same kegg_cat_l1/l2 inputs as func_kegg)
+    sel_l1 <- input$kegg_cat_l1 %||% ""
+    sel_l2 <- input$kegg_cat_l2 %||% ""
+    if (nchar(sel_l1) > 0) {
+      kc <- kc[!is.na(kc$l1) & kc$l1 == sel_l1, ]
+      if (nchar(sel_l2) > 0)
+        kc <- kc[!is.na(kc$l2) & kc$l2 == sel_l2, ]
+    }
     req(nrow(kc) > 0)
 
     # Count how many categories each KO maps to at this level
@@ -2989,7 +3005,7 @@ server <- function(input, output, session) {
 
     cats <- sort(unique(kc[[level]]))
 
-    # Aggregate raw abund with proportional weights
+    # Aggregate raw abund with proportional weights (selection only)
     agg_abund <- do.call(rbind, lapply(cats, function(cat) {
       rows <- kc[kc[[level]] == cat, ]
       if (nrow(rows) == 0) return(matrix(0, 1, ncol(abund_raw)))
@@ -2998,40 +3014,67 @@ server <- function(input, output, session) {
     }))
     rownames(agg_abund) <- cats
 
+    # Append "Other functions" row if requested
+    if (isTRUE(input$kegg_class_show_other) && !is.null(other_abund)) {
+      other_row        <- matrix(other_abund, nrow=1, ncol=ncol(agg_abund),
+                                 dimnames=list("Other functions", colnames(agg_abund)))
+      agg_abund        <- rbind(agg_abund, other_row)
+      cats             <- c(cats, "Other functions")
+    }
+
+    # Helper: compute TPM for a given agg matrix and kc subset
+    compute_tpm <- function(agg, kc_sub, cats_sub) {
+      orf_tbl <- tryCatch(proj$orfs$table, error=function(e) NULL)
+      if (is.null(orf_tbl)) return(agg)
+      ko_col  <- grep("KEGG", colnames(orf_tbl), value=TRUE)[1]
+      len_col <- grep("[Ll]ength.*[Nn][Tt]|[Nn][Tt].*[Ll]ength|^Length$", colnames(orf_tbl), value=TRUE)[1]
+      if (is.null(ko_col) || is.null(len_col)) return(agg)
+      orf_ko  <- as.character(orf_tbl[[ko_col]])
+      orf_len <- as.numeric(orf_tbl[[len_col]])
+      mean_len_kb <- sapply(cats_sub, function(cat) {
+        rows <- kc_sub[kc_sub[[level]] == cat, ]
+        lens <- orf_len[orf_ko %in% rows$id]
+        if (length(lens) == 0 || all(is.na(lens))) return(1)
+        mean(lens, na.rm=TRUE) / 1000
+      })
+      mean_len_kb[mean_len_kb == 0] <- 1
+      rpk <- agg / mean_len_kb
+      rpk_sums <- colSums(rpk, na.rm=TRUE)
+      rpk_sums[rpk_sums == 0] <- 1
+      sweep(rpk, 2, rpk_sums, "/") * 1e6
+    }
+
     # Derive requested metric
-    mat <- if (count == "percent") {
+    mat <- if (count == "percent_sel") {
       col_sums <- colSums(agg_abund, na.rm=TRUE)
       col_sums[col_sums == 0] <- 1
       sweep(agg_abund, 2, col_sums, "/") * 100
-    } else if (count == "tpm") {
-      # TPM: aggregate weighted RPK per category, then normalize to 1e6
-      # Need gene lengths from orfs$table
-      orf_tbl <- tryCatch(proj$orfs$table, error=function(e) NULL)
-      if (!is.null(orf_tbl)) {
-        ko_col  <- grep("KEGG", colnames(orf_tbl), value=TRUE)[1]
-        len_col <- grep("[Ll]ength.*[Nn][Tt]|[Nn][Tt].*[Ll]ength|^Length$", colnames(orf_tbl), value=TRUE)[1]
-        if (!is.null(ko_col) && !is.null(len_col)) {
-          orf_ko  <- as.character(orf_tbl[[ko_col]])
-          orf_len <- as.numeric(orf_tbl[[len_col]])
-          # Mean weighted length per category (weights = 1/N_categories)
-          mean_len_kb <- sapply(cats, function(cat) {
-            rows <- kc[kc[[level]] == cat, ]
-            lens <- orf_len[orf_ko %in% rows$id]
-            if (length(lens) == 0 || all(is.na(lens))) return(1)
-            mean(lens, na.rm=TRUE) / 1000
-          })
-          mean_len_kb[mean_len_kb == 0] <- 1
-          rpk <- agg_abund / mean_len_kb
-          rpk_sums <- colSums(rpk, na.rm=TRUE)
-          rpk_sums[rpk_sums == 0] <- 1
-          sweep(rpk, 2, rpk_sums, "/") * 1e6
-        } else agg_abund
+    } else if (count == "percent_full") {
+      # Denominator = total reads across ALL KOs in the full (unfiltered) abund matrix
+      col_sums_full <- colSums(abund_raw, na.rm=TRUE)
+      col_sums_full[col_sums_full == 0] <- 1
+      sweep(agg_abund, 2, col_sums_full, "/") * 100
+    } else if (count == "tpm_sel") {
+      compute_tpm(agg_abund, kc, cats)
+    } else if (count == "tpm_full") {
+      tpm_gene <- tryCatch(as.matrix(proj$functions[[kegg_db]]$tpm), error=function(e) NULL)
+      if (!is.null(tpm_gene)) {
+        tpm_gene <- tpm_gene[rownames(tpm_gene) %in% kc_full$id, , drop=FALSE]
+        m <- do.call(rbind, lapply(cats, function(cat) {
+          ids_in_cat <- kc_full$id[kc_full[[level]] == cat]
+          rows <- rownames(tpm_gene)[rownames(tpm_gene) %in% ids_in_cat]
+          if (length(rows) == 0) return(matrix(0, 1, ncol(tpm_gene)))
+          if (length(rows) == 1) as.numeric(tpm_gene[rows, , drop=TRUE])
+          else colSums(tpm_gene[rows, , drop=FALSE], na.rm=TRUE)
+        }))
+        rownames(m) <- cats; m
       } else agg_abund
     } else {
       agg_abund
     }
 
     mat <- as.matrix(mat)
+    rownames(mat) <- cats
     req(nrow(mat) > 0)
 
     # Rescale (order computed on raw values first)
@@ -3536,7 +3579,7 @@ server <- function(input, output, session) {
 
   output$func_category_ui <- renderUI({
     pt <- input$plot_type
-    req(startsWith(pt, "func_"))
+    req(startsWith(pt, "func_") || pt == "kegg_class")
 
     if (pt == "func_cog" && !is.null(COG_CATEGORIES)) {
       cats <- sort(setdiff(
@@ -3548,17 +3591,33 @@ server <- function(input, output, session) {
           choices  = c("All categories" = "", setNames(cats, cats)),
           selected = input$cog_category %||% ""))
 
-    } else if (pt == "func_kegg" && !is.null(KEGG_CATEGORIES)) {
-      # Selected state
+    } else if ((pt == "func_kegg" || pt == "kegg_class") && !is.null(KEGG_CATEGORIES)) {
+      kegg_level <- if (pt == "kegg_class") input$kegg_class_level %||% "l1" else "l3"
+      if (pt == "kegg_class" && kegg_level == "l1") return(NULL)
       sel_l1 <- input$kegg_cat_l1 %||% ""
-      sel_l2 <- input$kegg_cat_l2 %||% ""
-
-      # Build collapsible tree from KEGG_CATEGORIES l1/l2
+      sel_l2 <- if (pt == "kegg_class" && kegg_level == "l2") "" else input$kegg_cat_l2 %||% ""
+      show_l2_in_tree <- !(pt == "kegg_class" && kegg_level == "l2")
       l1_vals <- sort(intersect(
         unique(KEGG_CATEGORIES$l1[!is.na(KEGG_CATEGORIES$l1)]),
         KEGG_L1_SHOW))
 
       tree_items <- lapply(l1_vals, function(l1) {
+        if (!show_l2_in_tree) {
+          is_sel_l1_flat <- sel_l1 == l1 && sel_l2 == ""
+          return(tags$div(
+            class = "pw-item",
+            style = paste0(
+              "padding:3px 4px; cursor:pointer; font-size:0.8rem; font-weight:700;",
+              "border-radius:3px; color:var(--text);",
+              if (is_sel_l1_flat) "background:var(--accent-light);" else ""),
+            onclick = sprintf(
+              "Shiny.setInputValue('kegg_cat_l1','%s',{priority:'event'});
+               Shiny.setInputValue('kegg_cat_l2','',{priority:'event'});
+               document.querySelectorAll('.pw-item').forEach(function(el){el.style.background=''});
+               this.style.background='var(--accent-light)';",
+              gsub("'", "\\'", l1, fixed=TRUE)),
+            l1))
+        }
         l2_vals <- sort(unique(KEGG_CATEGORIES$l2[
           KEGG_CATEGORIES$l1 == l1 & !is.na(KEGG_CATEGORIES$l2)]))
 
