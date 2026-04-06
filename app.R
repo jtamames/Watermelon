@@ -75,6 +75,62 @@ message("COG_CATEGORIES: ", if(is.null(COG_CATEGORIES)) "NOT FOUND" else paste(n
 message("KEGG_CATEGORIES: ", if(is.null(KEGG_CATEGORIES)) "NOT FOUND" else paste(nrow(KEGG_CATEGORIES),"rows"))
 
 `%||%` <- function(a, b) if (!is.null(a)) a else b
+
+# Helper: sidebar label with a hover tooltip info icon
+# tip: plain string, OR named character vector (names=labels, values=descriptions) -> bullet list
+help_label <- function(label, tip, style="margin-top:4px;") {
+  if (is.character(tip) && length(tip) > 1 && !is.null(names(tip))) {
+    bullets <- paste(mapply(function(nm, desc) paste0("\u2022 ", nm, ": ", desc), names(tip), tip), collapse="\n")
+    tip_txt  <- paste0("Type of abundance measurement:\n", bullets)
+  } else {
+    tip_txt <- tip
+  }
+  tags$div(class="form-label", style=style,
+    label,
+    tags$span(
+      style=paste0("display:inline-block; margin-left:4px; cursor:help;",
+                   "color:var(--muted); font-size:0.78rem; vertical-align:middle;"),
+      title=tip_txt, "\u24d8"
+    )
+  )
+}
+
+# Standard count type descriptions
+.count_descs <- c(
+  "Raw abundances"  = "Number of occurrences",
+  "Base counts"     = "Accumulated length in bases",
+  "Percentages"     = "Relative abundance as percentage of total",
+  "CPM"             = "Normalized abundance per million reads",
+  "TPM"             = "Normalized abundance per length and per million reads",
+  "Copy number"     = "Number of different instances of the feature"
+)
+# Build a count type tooltip from a named vector of choices
+.count_tip <- function(choices) {
+  # choices: named vector as passed to selectInput (names=labels, values=ids)
+  label_map <- c(
+    abund        = "Raw abundances",
+    bases        = "Base counts",
+    percent      = "Percentages",
+    cpm          = "CPM",
+    tpm          = "TPM",
+    copy_number  = "Copy number",
+    percent_full = "Percentages",
+    percent_sel  = "Percentages (selection)",
+    tpm_full     = "TPM",
+    tpm_sel      = "TPM (selection)"
+  )
+  ids    <- unname(choices)
+  labels <- names(choices)
+  # For each choice, get description
+  descs <- sapply(seq_along(ids), function(i) {
+    lbl <- label_map[ids[i]]
+    if (is.na(lbl)) lbl <- labels[i]
+    desc <- .count_descs[lbl]
+    if (is.na(desc)) "" else desc
+  })
+  names(descs) <- labels
+  descs[descs != ""]
+}
 # \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 #  LIGHT THEME
 # \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -1716,7 +1772,7 @@ ui <- page_navbar(
         tags$div(class = "sidebar-box",
           tags$div(class = "form-label", "KEGG Pathway"),
           uiOutput("pw_pathway_select_ui"),
-          tags$div(class = "form-label", style = "margin-top:4px;", "Count type"),
+          help_label("Count type", "Type of abundance measurement used for the ordination analysis"),
           uiOutput("pw_count_ui")
         ),
         tags$div(class = "sidebar-box",
@@ -2304,7 +2360,7 @@ server <- function(input, output, session) {
           ) else tags$div(class="func-search-hint",style="color:#c0392b;","\u26a0 Taxonomy search requires a full SQM object.")
         ),
         tags$div(class="sidebar-box",style="margin-top:8px;",
-          tags$div(class="form-label","Count type"),
+          help_label("Count type", .count_tip(tax_counts)),
           selectInput("tax_count",NULL,choices=tax_counts,selected=if("percent"%in%tax_counts)"percent" else tax_counts[[1]]),
           tags$div(class="form-label",style="margin-top:4px;","No. of taxa"),
           numericInput("n_taxa",NULL,value=15,min=1,max=200,step=1)
@@ -2325,12 +2381,12 @@ server <- function(input, output, session) {
         tags$div(class="sidebar-box",
           tags$div(class="form-label","Taxonomic rank"),
           selectInput("tax_hm_rank", NULL, choices=avail_ranks),
-          tags$div(class="form-label",style="margin-top:4px;","Count type"),
+          help_label("Count type", .count_tip(tax_counts)),
           selectInput("tax_hm_count", NULL, choices=tax_counts,
             selected=if("percent"%in%tax_counts)"percent" else tax_counts[[1]]),
           tags$div(class="form-label",style="margin-top:4px;","No. of taxa"),
           numericInput("tax_hm_n", NULL, value=30, min=1, max=500, step=1),
-          tags$div(class="form-label",style="margin-top:4px;","Rescale"),
+          help_label("Rescale", "Options for rescaling and normalizing data: None, Logarithmic (log₁₀(x+1)), Z-score (rows)"),
           selectInput("tax_hm_scale", NULL,
             choices=c("None"="none","Log₁₀(x+1)"="log","Z-score"="zscore"),
             selected="none")
@@ -2353,7 +2409,12 @@ server <- function(input, output, session) {
                          "L2 (subcategories)"="l2",
                          "L3 (pathways)"="l3"),
             selected = "l1"),
-          tags$div(class="form-label",style="margin-top:4px;","Count type"),
+          help_label("Count type", .count_tip(c(
+            "Raw abundances"="abund",
+            "Percentage (selection)"="percent_sel",
+            "Percentage (full dataset)"="percent_full",
+            "TPM (selection)"="tpm_sel",
+            "TPM (full dataset)"="tpm_full"))),
           selectInput("kegg_class_count", NULL,
             choices  = c("Raw abundances"="abund",
                          "Percentage (selection)"="percent_sel",
@@ -2361,7 +2422,7 @@ server <- function(input, output, session) {
                          "TPM (selection)"="tpm_sel",
                          "TPM (full dataset)"="tpm_full"),
             selected = "abund"),
-          tags$div(class="form-label",style="margin-top:4px;","Rescale"),
+          help_label("Rescale", "Options for rescaling and normalizing data: None, Logarithmic (log₁₀(x+1)), Z-score (rows)"),
           selectInput("plot_scale", NULL,
             choices=c("None"="none","Log₁₀(x+1)"="log","Z-score"="zscore"),
             selected="none"),
@@ -2373,7 +2434,7 @@ server <- function(input, output, session) {
       fun_counts <- if (!is.null(sqm_data())) available_func_counts(sqm_data(), "COG") else c("Copy number"="copy_number")
       tagList(
         tags$div(class="sidebar-box",
-          tags$div(class="form-label","Count type"),
+          help_label("Count type", .count_tip(c("Raw abundances"="abund","Percentage"="percent_full","TPM"="tpm_full"))),
           selectInput("cog_class_count", NULL,
             choices  = c("Raw abundances"="abund",
                          "Percentage"="percent_full",
@@ -2381,7 +2442,7 @@ server <- function(input, output, session) {
             selected = "abund"),
           tags$div(class="form-label",style="margin-top:4px;"),
           checkboxInput("cog_class_excl_unknown", "Exclude 'Function unknown'", value=FALSE),
-          tags$div(class="form-label",style="margin-top:4px;","Rescale"),
+          help_label("Rescale", "Options for rescaling and normalizing data: None, Logarithmic (log₁₀(x+1)), Z-score (rows)"),
           selectInput("plot_scale", NULL,
             choices=c("None"="none","Log₁₀(x+1)"="log","Z-score"="zscore"),
             selected="none")
@@ -2401,9 +2462,9 @@ server <- function(input, output, session) {
         ),
         uiOutput("func_category_ui"),
         tags$div(class="sidebar-box",style="margin-top:8px;",
-          tags$div(class="form-label","Count type"), uiOutput("func_count_ui"),
+          help_label("Count type", .count_tip(if(!is.null(sqm_data())) available_func_counts(sqm_data(), toupper(sub("^func_","",input$plot_type))) else c("Copy number"="copy_number"))), uiOutput("func_count_ui"),
           tags$div(class="form-label",style="margin-top:4px;","No. of functions"), numericInput("n_funcs", NULL, value=20, min=1, max=500, step=1),
-          tags$div(class="form-label",style="margin-top:4px;","Rescale"),
+          help_label("Rescale", "Options for rescaling and normalizing data: None, Logarithmic (log₁₀(x+1)), Z-score (rows)"),
           selectInput("plot_scale", NULL,
             choices=c("None"="none","Log₁₀(x+1)"="log","Z-score"="zscore"),
             selected="none")
@@ -2872,26 +2933,26 @@ server <- function(input, output, session) {
     }))
     rownames(agg_raw) <- cats
 
-    # For "full dataset" metrics: aggregate the precomputed per-gene values from SQMtools
-    # This avoids recalculating and is consistent with what SQMtools already computed.
-    agg_precomputed <- function(metric_name) {
-      mat_gene <- tryCatch(as.matrix(proj$functions[[cog_db]][[metric_name]]), error=function(e) NULL)
-      if (is.null(mat_gene)) return(agg_raw)
-      mat_gene <- mat_gene[rownames(mat_gene) %in% rownames(abund_raw), , drop=FALSE]
-      cv_sub   <- cat_vec[match(rownames(mat_gene), rownames(abund_raw))]
-      do.call(rbind, lapply(cats, function(cat) {
-        rows <- which(cv_sub == cat)
-        if (length(rows) == 0) return(matrix(0, 1, ncol(mat_gene)))
-        if (length(rows) == 1) mat_gene[rows, , drop=FALSE]
-        else colSums(mat_gene[rows, , drop=FALSE], na.rm=TRUE)
-      }))
-    }
-
     # Derive requested metric
     mat <- if (count == "percent_full") {
-      agg_precomputed("percent")
+      # Percentage over full dataset: agg_raw / total_reads_per_sample * 100
+      col_sums_full <- colSums(abund_raw, na.rm=TRUE)
+      col_sums_full[col_sums_full == 0] <- 1
+      sweep(agg_raw, 2, col_sums_full, "/") * 100
     } else if (count == "tpm_full") {
-      agg_precomputed("tpm")
+      # TPM: use precomputed per-gene TPM from SQMtools, sum by COG class
+      tpm_gene <- tryCatch(as.matrix(proj$functions[[cog_db]]$tpm), error=function(e) NULL)
+      if (!is.null(tpm_gene)) {
+        tpm_gene <- tpm_gene[rownames(tpm_gene) %in% rownames(abund_raw), , drop=FALSE]
+        cv_tpm   <- cat_vec[match(rownames(tpm_gene), rownames(abund_raw))]
+        m <- do.call(rbind, lapply(cats, function(cat) {
+          rows <- which(cv_tpm == cat)
+          if (length(rows) == 0) return(rep(0, ncol(tpm_gene)))
+          if (length(rows) == 1) as.numeric(tpm_gene[rows, , drop=TRUE])
+          else colSums(tpm_gene[rows, , drop=FALSE], na.rm=TRUE)
+        }))
+        rownames(m) <- cats; m
+      } else agg_raw
     } else {
       agg_raw   # raw abundances
     }
