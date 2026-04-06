@@ -353,6 +353,8 @@ available_plot_types <- function(proj) {
       # Add COG functional classes if COG_CATEGORIES is available
       if (toupper(db) == "COG" && !is.null(COG_CATEGORIES) && nrow(COG_CATEGORIES) > 0)
         choices <- c(choices, "COG (functional classes)" = "cog_class")
+      if (toupper(db) == "KEGG" && !is.null(KEGG_CATEGORIES) && nrow(KEGG_CATEGORIES) > 0)
+        choices <- c(choices, "KEGG (functional classes)" = "kegg_class")
     }
   }
 
@@ -1793,7 +1795,7 @@ server <- function(input, output, session) {
     is_tax_hm <- pt == "taxonomy_heatmap"
     if (pt == "taxonomy_bar") {
       shinyjs::show("fmt_tax"); shinyjs::hide("fmt_func"); shinyjs::hide("fmt_tax_hm")
-    } else if (is_fn || pt == "cog_class") {
+    } else if (is_fn || pt == "cog_class" || pt == "kegg_class") {
       shinyjs::hide("fmt_tax"); shinyjs::show("fmt_func"); shinyjs::hide("fmt_tax_hm")
     } else if (is_tax_hm) {
       shinyjs::hide("fmt_tax"); shinyjs::hide("fmt_func"); shinyjs::show("fmt_tax_hm")
@@ -2341,6 +2343,25 @@ server <- function(input, output, session) {
           )
         )
       )
+    } else if (pt == "kegg_class") {
+      tagList(
+        tags$div(class="sidebar-box",
+          tags$div(class="form-label","Hierarchy level"),
+          selectInput("kegg_class_level", NULL,
+            choices  = c("L1 (broad categories)"="l1",
+                         "L2 (subcategories)"="l2",
+                         "L3 (pathways)"="l3"),
+            selected = "l1"),
+          tags$div(class="form-label",style="margin-top:4px;","Count type"),
+          selectInput("kegg_class_count", NULL,
+            choices  = c("Raw abundances"="abund", "Percentages"="percent", "TPM"="tpm"),
+            selected = "abund"),
+          tags$div(class="form-label",style="margin-top:4px;","Rescale"),
+          selectInput("plot_scale", NULL,
+            choices=c("None"="none","Log₁₀(x+1)"="log","Z-score"="zscore"),
+            selected="none")
+        )
+      )
     } else if (pt == "cog_class") {
       fun_counts <- if (!is.null(sqm_data())) available_func_counts(sqm_data(), "COG") else c("Copy number"="copy_number")
       tagList(
@@ -2419,19 +2440,23 @@ server <- function(input, output, session) {
     is_tax     <- !is.null(pt) && pt == "taxonomy_bar"
     is_tax_hm   <- !is.null(pt) && pt == "taxonomy_heatmap"
     is_func     <- !is.null(pt) && startsWith(pt, "func_")
-    is_cog_class <- !is.null(pt) && pt == "cog_class"
-    h <- if (is_tax)       input$tax_plot_height %||% 560
-         else if (is_func || is_cog_class) input$func_plot_height %||% 560
-         else if (is_tax_hm) input$tax_hm_height   %||% 560
+    is_cog_class  <- !is.null(pt) && pt == "cog_class"
+    is_kegg_class <- !is.null(pt) && pt == "kegg_class"
+    h <- if (is_tax) input$tax_plot_height %||% 560
+         else if (is_func || is_cog_class || is_kegg_class) input$func_plot_height %||% 560
+         else if (is_tax_hm) input$tax_hm_height %||% 560
          else 560
-    w <- if (is_tax)       input$tax_plot_width  %||% 800
-         else if (is_func || is_cog_class) input$func_plot_width  %||% 1200
-         else if (is_tax_hm) input$tax_hm_width    %||% 1200
+    w <- if (is_tax) input$tax_plot_width  %||% 800
+         else if (is_func || is_cog_class || is_kegg_class) input$func_plot_width  %||% 1200
+         else if (is_tax_hm) input$tax_hm_width %||% 1200
          else NULL
     style <- if (!is.null(w)) paste0("width:",w,"px; overflow-x:auto;") else "width:100%;"
     if (is_cog_class) {
       tags$div(style="width:100%; overflow-x:auto; overflow-y:auto; max-height:80vh;",
         plotlyOutput("sqm_cog_class_plot", width="100%", height="auto"))
+    } else if (is_kegg_class) {
+      tags$div(style="width:100%; overflow-x:auto; overflow-y:auto; max-height:80vh;",
+        plotlyOutput("sqm_kegg_class_plot", width="100%", height="auto"))
     } else if (is_tax_hm) {
       tags$div(style="width:100%; overflow-x:auto; overflow-y:auto; max-height:80vh;",
         plotlyOutput("sqm_tax_hm_plot", width="100%", height="auto"))
@@ -2486,6 +2511,8 @@ server <- function(input, output, session) {
       return(NULL)  # handled by tax_hm_reactive / sqm_tax_hm_plot
     } else if (pt == "cog_class") {
       return(NULL)  # handled by cog_class_reactive / sqm_cog_class_plot
+    } else if (pt == "kegg_class") {
+      return(NULL)  # handled by kegg_class_reactive / sqm_kegg_class_plot
     } else if (startsWith(pt, "func_")) {
       return(NULL)  # handled by func_plot_reactive / sqm_func_plot
     } else if (pt=="bins") { plotBins(proj) }
@@ -2917,6 +2944,119 @@ server <- function(input, output, session) {
   })
   output$sqm_cog_class_plot <- renderPlotly({ cog_class_reactive() })
 
+  # ── KEGG functional classes reactive ───────────────────────────────────────────
+  kegg_class_reactive <- reactive({
+    req(sqm_data()); proj <- sqm_data()
+    req(input$plot_type == "kegg_class")
+    req(!is.null(KEGG_CATEGORIES))
+    fs    <- input$func_font_size    %||% 11
+    count <- input$kegg_class_count  %||% "abund"
+    level <- input$kegg_class_level  %||% "l1"
+
+    # Subset samples
+    all_smp <- tryCatch(proj$misc$samples, error=function(e) NULL)
+    sel_smp <- input$plot_samples
+    if (!is.null(all_smp) && !is.null(sel_smp) && length(sel_smp) > 0 &&
+        !setequal(sel_smp, all_smp))
+      proj <- tryCatch(subsetSamples(proj, sel_smp), error=function(e) proj)
+
+    kegg_db   <- names(proj$functions)[toupper(names(proj$functions)) == "KEGG"][1]
+    req(!is.null(kegg_db))
+    abund_raw <- tryCatch(as.matrix(proj$functions[[kegg_db]]$abund), error=function(e) NULL)
+    req(!is.null(abund_raw) && nrow(abund_raw) > 0)
+
+    # Build a weight table: for each (KO, category) pair, weight = 1 / n_categories_of_that_KO
+    # This distributes reads proportionally across all categories a KO belongs to,
+    # so totals remain additive and L1 = sum of its L2 = sum of its L3.
+    kc <- KEGG_CATEGORIES[!is.na(KEGG_CATEGORIES[[level]]) &
+                           nchar(trimws(KEGG_CATEGORIES[[level]])) > 0, ]
+    kc <- kc[kc$id %in% rownames(abund_raw), ]
+    req(nrow(kc) > 0)
+
+    # Count how many categories each KO maps to at this level
+    ko_cat_counts <- table(kc$id)
+    kc$weight     <- 1 / as.numeric(ko_cat_counts[kc$id])
+
+    cats <- sort(unique(kc[[level]]))
+
+    # Aggregate raw abund with proportional weights
+    agg_abund <- do.call(rbind, lapply(cats, function(cat) {
+      rows <- kc[kc[[level]] == cat, ]
+      if (nrow(rows) == 0) return(matrix(0, 1, ncol(abund_raw)))
+      weighted <- sweep(abund_raw[rows$id, , drop=FALSE], 1, rows$weight, "*")
+      colSums(weighted, na.rm=TRUE)
+    }))
+    rownames(agg_abund) <- cats
+
+    # Derive requested metric
+    mat <- if (count == "percent") {
+      col_sums <- colSums(agg_abund, na.rm=TRUE)
+      col_sums[col_sums == 0] <- 1
+      sweep(agg_abund, 2, col_sums, "/") * 100
+    } else if (count == "tpm") {
+      # TPM: aggregate weighted RPK per category, then normalize to 1e6
+      # Need gene lengths from orfs$table
+      orf_tbl <- tryCatch(proj$orfs$table, error=function(e) NULL)
+      if (!is.null(orf_tbl)) {
+        ko_col  <- grep("KEGG", colnames(orf_tbl), value=TRUE)[1]
+        len_col <- grep("[Ll]ength.*[Nn][Tt]|[Nn][Tt].*[Ll]ength|^Length$", colnames(orf_tbl), value=TRUE)[1]
+        if (!is.null(ko_col) && !is.null(len_col)) {
+          orf_ko  <- as.character(orf_tbl[[ko_col]])
+          orf_len <- as.numeric(orf_tbl[[len_col]])
+          # Mean weighted length per category (weights = 1/N_categories)
+          mean_len_kb <- sapply(cats, function(cat) {
+            rows <- kc[kc[[level]] == cat, ]
+            lens <- orf_len[orf_ko %in% rows$id]
+            if (length(lens) == 0 || all(is.na(lens))) return(1)
+            mean(lens, na.rm=TRUE) / 1000
+          })
+          mean_len_kb[mean_len_kb == 0] <- 1
+          rpk <- agg_abund / mean_len_kb
+          rpk_sums <- colSums(rpk, na.rm=TRUE)
+          rpk_sums[rpk_sums == 0] <- 1
+          sweep(rpk, 2, rpk_sums, "/") * 1e6
+        } else agg_abund
+      } else agg_abund
+    } else {
+      agg_abund
+    }
+
+    mat <- as.matrix(mat)
+    req(nrow(mat) > 0)
+
+    # Rescale (order computed on raw values first)
+    row_order <- order(rowSums(agg_abund, na.rm=TRUE), decreasing=TRUE)
+    scl <- input$plot_scale %||% "none"
+    if (scl == "log") {
+      mat <- log10(mat + 1)
+    } else if (scl == "zscore") {
+      mat <- t(apply(mat, 1, function(r) {
+        s <- sd(r, na.rm=TRUE)
+        if (is.na(s) || s == 0) r - mean(r, na.rm=TRUE) else (r - mean(r, na.rm=TRUE)) / s
+      }))
+    }
+    mat <- mat[row_order, , drop=FALSE]
+
+    pw <- input$func_plot_width  %||% 1200
+    ph <- nrow(mat) * 28 + 120
+
+    p <- plot_ly(
+      z=mat, x=colnames(mat), y=rownames(mat),
+      type="heatmap", colorscale=input$func_palette %||% "Blues",
+      reversescale=FALSE,
+      hovertemplate="<b>%{y}</b><br>Sample: %{x}<br>Value: %{z:.4f}<extra></extra>",
+      width=pw, height=ph
+    )
+    p <- layout(p,
+      xaxis  = list(title="", tickfont=list(size=fs), tickangle=-45, automargin=TRUE),
+      yaxis  = list(title="", tickfont=list(size=fs), automargin=TRUE, autorange="reversed"),
+      margin = list(l=10, r=10, t=30, b=60),
+      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+    )
+    config(p, displayModeBar=FALSE)
+  })
+  output$sqm_kegg_class_plot <- renderPlotly({ kegg_class_reactive() })
+
   # ── Taxonomy heatmap reactive ──
   tax_hm_reactive <- reactive({
     req(sqm_data()); proj <- sqm_data()
@@ -3001,7 +3141,7 @@ server <- function(input, output, session) {
       pt         <- isolate(input$plot_type)
       is_tax     <- !is.null(pt) && pt == "taxonomy_bar"
       is_tax_hm  <- !is.null(pt) && pt == "taxonomy_heatmap"
-      is_func    <- !is.null(pt) && (startsWith(pt, "func_") || pt == "cog_class")
+      is_func    <- !is.null(pt) && (startsWith(pt, "func_") || pt == "cog_class" || pt == "kegg_class")
       w <- if (is_tax)     isolate(input$tax_plot_width  %||% 800)
            else if (is_func)   isolate(input$func_plot_width  %||% 1200)
            else if (is_tax_hm) isolate(input$tax_hm_width    %||% 1200)
