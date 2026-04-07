@@ -416,7 +416,7 @@ available_plot_types <- function(proj) {
 
   # Bins
   has_bins <- tryCatch(has_data(proj$bins$table), error = function(e) FALSE)
-  if (has_bins) choices <- c(choices, "Binning" = "bins")
+  if (has_bins) choices <- c(choices, "MAGs" = "bins")
 
   if (length(choices) == 0) choices <- c("(no data)" = "none")
   choices
@@ -1642,7 +1642,9 @@ ui <- page_navbar(
   nav_panel("Project",
     layout_sidebar(fillable = FALSE,
       sidebar = sidebar(width = 300, open = TRUE,
-        tags$div(class = "form-label mt-1", "Project directory"),
+        help_label("Project directory",
+          "SqueezeMeta, SQM_reads or SQM_longreads project directory. It will look for a directory 'tables' in that directory, otherwise will ask for the appropriate location of the tables.",
+          style="margin-top:0.25rem;"),
         shinyDirButton("dir_project", "Select directory", "Choose the project directory",
           multiple = FALSE, class = "btn-default w-100 mb-1"),
         tags$div(class = "path-info", textOutput("path_project", inline = TRUE)),
@@ -1657,7 +1659,11 @@ ui <- page_navbar(
     layout_sidebar(
       sidebar = sidebar(width = 250,
         tags$div(class = "sidebar-box",
-          tags$div(class = "form-label", "Plot type"),
+          help_label("Plot type",
+            c("Taxonomic profiles" = "Distribution of taxa across samples at different taxonomic ranks",
+              "Functional profiles" = "Distribution of functional categories (COG, KEGG, PFAM, etc.) across samples",
+              "MAGs" = "Abundance of Metagenome-Assembled Genomes across samples"),
+            style=""),
           uiOutput("plot_type_ui")
         ),
         uiOutput("plot_controls_ui"),
@@ -2441,7 +2447,14 @@ server <- function(input, output, session) {
                          "TPM"="tpm_full"),
             selected = "abund"),
           tags$div(class="form-label",style="margin-top:4px;"),
-          checkboxInput("cog_class_excl_unknown", "Exclude 'Function unknown'", value=FALSE),
+          tags$div(style="display:flex; align-items:center; gap:4px; margin-top:6px;",
+            checkboxInput("cog_class_excl_unknown", "Exclude 'Function unknown'", value=TRUE),
+            tags$span(
+              style="cursor:help; color:var(--muted); font-size:0.78rem; margin-top:2px;",
+              title="Do not consider instances with other or no assigned function",
+              "\u24d8"
+            )
+          ),
           help_label("Rescale", "Options for rescaling and normalizing data: None, Logarithmic (log₁₀(x+1)), Z-score (rows)"),
           selectInput("plot_scale", NULL,
             choices=c("None"="none","Log₁₀(x+1)"="log","Z-score"="zscore"),
