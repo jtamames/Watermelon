@@ -305,13 +305,20 @@ This section explains how to make SQMxplore accessible to remote users via **Shi
 All packages must be installed as root so Shiny Server can find them:
 
 ```bash
+# Install cmake first — required to compile the 'fs' R package
+sudo apt-get install -y cmake
+
 sudo R -e "install.packages(c('shiny','shinyjs','shinyFiles','bslib','DT','plotly','SQMtools','vegan'), repos='https://cran.rstudio.com/')"
 
-# Optional: pathview
-sudo R -e "if (!require('BiocManager', quietly=TRUE)) install.packages('BiocManager'); BiocManager::install('pathview')"
+# Optional: pathview and Biostrings (required by SQMtools)
+# Note: use single quotes for the outer string to avoid bash interpreting '!'
+sudo R -e 'install.packages("BiocManager", repos="https://cran.rstudio.com/")'
+sudo R -e 'BiocManager::install(c("pathview", "Biostrings"))'
 ```
 
 If you are on Ubuntu inside a conda environment and get compilation errors, use RSPM precompiled binaries first (see [System dependencies](#system-dependencies) above).
+
+> **Note:** these commands must be run **outside** any conda environment, so that the system R (typically `/usr/bin/R`) is used. Shiny Server uses the system R, not the one inside the conda environment. Run `conda deactivate` before proceeding, and verify with `which R`.
 
 ### 2. Install Shiny Server
 
@@ -356,6 +363,14 @@ sudo usermod -aG your_data_group shiny
 # Option B: grant read access explicitly
 sudo chmod -R o+rX /path/to/your/sqm/projects
 ```
+
+Also make sure the `shiny` user can traverse your home directory if the projects are inside it:
+
+```bash
+chmod o+x /home/your_username
+```
+
+> **Note on directory navigation in the app:** the file browser shows two roots: `home` (which maps to `/home/shiny`, the Shiny Server user's home — typically empty) and `root` (which maps to `/`). To reach your project data, choose **root** and then navigate to the full path: `root → home → your_username → your_project`.
 
 ### 6. Start and enable the service
 
@@ -450,6 +465,14 @@ tail -f /var/log/shiny-server/*.log
 **shiny user cannot read project files**
 ```bash
 sudo chmod -R o+rX /path/to/sqm/project
+```
+
+**`app_cache` permission errors in the log**
+
+If the log shows repeated warnings about `/srv/shiny-server/sqmxplore/app_cache`, fix ownership:
+```bash
+sudo chown -R shiny:shiny /srv/shiny-server/sqmxplore/
+sudo systemctl restart shiny-server
 ```
 
 **Port 3838 not reachable**
