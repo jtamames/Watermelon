@@ -1678,12 +1678,12 @@ ui <- page_navbar(
   nav_panel("Project",
     layout_sidebar(fillable = FALSE,
       sidebar = sidebar(width = 300, open = TRUE,
-        help_label("Project directory",
-          "SqueezeMeta, SQM_reads or SQM_longreads project directory. It will look for a directory 'tables' in that directory, otherwise will ask for the appropriate location of the tables.",
-          style="margin-top:0.25rem;"),
-        shinyDirButton("dir_project", "Select directory", "Choose the project directory",
-          multiple = FALSE, class = "btn-default w-100 mb-1"),
-        tags$div(class = "path-info", textOutput("path_project", inline = TRUE)),
+        tags$div(class = "sidebar-box",
+          tags$div(class = "form-label", "Load mode"),
+          radioButtons("load_mode", NULL,
+            choices  = c("Load project" = "project", "Load tables" = "tables"),
+            selected = "project", inline = TRUE)),
+        uiOutput("project_dir_ui"),
         uiOutput("project_info_ui"), uiOutput("manual_tables_ui"),
         actionButton("load_project", "Load", class = "btn-primary w-100 mb-2"),
         uiOutput("project_status_ui")
@@ -2102,6 +2102,31 @@ server <- function(input, output, session) {
   shinyDirChoose(input, "dir_manual_tables", roots = roots)
   path_project <- reactive({ req(input$dir_project); parseDirPath(roots, input$dir_project) })
   output$path_project <- renderText({ tryCatch(path_project(), error = function(e) "") })
+
+  output$project_dir_ui <- renderUI({
+    if ((input$load_mode %||% "project") == "project") {
+      tagList(
+        help_label("Project directory",
+          "SqueezeMeta, SQM_reads or SQM_longreads project directory. It will look for a directory 'tables' in that directory, otherwise will ask for the appropriate location of the tables.",
+          style = "margin-top:0.25rem;"),
+        shinyDirButton("dir_project", "Select directory", "Choose the project directory",
+          multiple = FALSE, class = "btn-default w-100 mb-1"),
+        tags$div(class = "path-info", textOutput("path_project", inline = TRUE))
+      )
+    } else {
+      tagList(
+        help_label("Tables directory",
+          "Directory containing the SQMlite tables (output of sqm2tables.py, sqmreads2tables.py or combine-sqm-tables.py).",
+          style = "margin-top:0.25rem;"),
+        shinyDirButton("dir_manual_tables", "Select tables directory", "Choose the tables directory",
+          multiple = FALSE, class = "btn-default w-100 mb-1"),
+        tags$div(class = "path-info", textOutput("path_manual_tables", inline = TRUE))
+      )
+    }
+  })
+  output$path_manual_tables <- renderText({
+    tryCatch(parseDirPath(roots, input$dir_manual_tables), error = function(e) "")
+  })
   observeEvent(path_project(), {
     proj_dir <- path_project(); req(nchar(proj_dir) > 0)
     need_manual(FALSE); tables_path(NULL); creator_name(NULL)
@@ -2142,6 +2167,7 @@ server <- function(input, output, session) {
     )
   })
   output$manual_tables_ui <- renderUI({
+    req((input$load_mode %||% "project") == "project")
     req(need_manual())
     tagList(
       tags$div(class = "path-info", style = "color:#c0392b;", "Tables directory could not be found automatically."),
@@ -2151,14 +2177,20 @@ server <- function(input, output, session) {
     )
   })
   observeEvent(input$load_project, {
-    tp <- tables_path()
-    if (is.null(tp) || !dir.exists(tp)) {
-      showNotification("Directory not available. Please select it manually.", type = "error", duration = 8); return()
+    mode <- input$load_mode %||% "project"
+    tp <- if (mode == "tables") {
+      tryCatch(parseDirPath(roots, input$dir_manual_tables), error = function(e) NULL)
+    } else {
+      tables_path()
+    }
+    if (is.null(tp) || nchar(tp) == 0 || !dir.exists(tp)) {
+      showNotification("Directory not available. Please select it.", type = "error", duration = 8); return()
     }
     status("loading")
     shinyjs::delay(50, {
       tryCatch({
-        is_sqm <- grepl("SqueezeMeta", creator_name() %||% "", ignore.case = TRUE)
+        is_sqm <- if (mode == "tables") FALSE else
+                  grepl("SqueezeMeta", creator_name() %||% "", ignore.case = TRUE)
         proj <- if (is_sqm) loadSQM(tp) else loadSQMlite(tp)
         sqm_data(proj); is_sqm_full(is_sqm); status("ready")
       }, error = function(e) { status("error"); showNotification(paste("Error:", e$message), type = "error", duration = 8) })
