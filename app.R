@@ -4497,7 +4497,7 @@ server <- function(input, output, session) {
   mv_pca_res <- reactiveVal(NULL)     # list: rda object + metadata
 
   output$mv_feat_labels_ui <- renderUI({
-    req(input$mv_method %||% "pca" == "pca")
+    req(input$mv_method %||% "pca" %in% c("pca", "ca"))
     tags$div(style = "display:flex; align-items:center; gap:4px;",
       tags$input(id = "mv_show_feat_labels", type = "checkbox",
         style = "margin:0; width:13px; height:13px; cursor:pointer;",
@@ -4510,7 +4510,7 @@ server <- function(input, output, session) {
 
   output$mv_card_title_ui <- renderUI({
     method <- input$mv_method %||% "pca"
-    span(if (method == "nmds") "NMDS" else "PCA")
+    span(switch(method, pca = "PCA", ca = "CA", nmds = "NMDS"))
   })
 
   # \u2500\u2500 Unified sidebar controls (sidebar-box style, method-conditional) \u2500\u2500
@@ -4519,6 +4519,8 @@ server <- function(input, output, session) {
     method    <- input$mv_method    %||% "pca"
     data_type <- input$mv_data_type %||% "taxonomy"
     is_pca    <- method == "pca"
+    is_ca     <- method == "ca"
+    is_eigen  <- is_pca || is_ca  # PCA and CA both show normalization (CA ignores it but shows Raw only)
 
     # Rank/DB choices
     if (data_type == "taxonomy") {
@@ -4547,13 +4549,24 @@ server <- function(input, output, session) {
     samples <- tryCatch(proj$misc$samples, error = function(e) NULL)
 
     tagList(
-      # \u2500\u2500 Box 1: Analysis type \u2500\u2500
+      # ── Box 1: Analysis type ──
       tags$div(class = "sidebar-box",
-        tags$div(class = "form-label", "Analysis type"),
+        help_label("Analysis type",
+          paste0(
+            "PCA (Principal Component Analysis): linear method, assumes normally distributed data. ",
+            "Best with CLR or log-normalized counts. Fast and interpretable, but sensitive to outliers and ",
+            "does not handle zero-inflated data well.\n\n",
+            "CA (Correspondence Analysis): like PCA but designed for count data. ",
+            "Works directly on raw counts, preserves chi-square distances. ",
+            "Recommended for compositional community data. May show arch effect with long gradients.\n\n",
+            "NMDS (Non-metric Multidimensional Scaling): non-linear, rank-based method. ",
+            "Most robust for ecological community data — handles zeros, non-normality and complex gradients. ",
+            "Slower and requires choosing a distance metric. Use stress value to assess fit (< 0.2 acceptable, < 0.1 good)."
+          )),
         selectInput("mv_method", NULL,
-          choices = c("PCA" = "pca", "NMDS" = "nmds"), selected = method)),
+          choices = c("PCA" = "pca", "CA" = "ca", "NMDS" = "nmds"), selected = method)),
 
-      # \u2500\u2500 Box 2: Data type + Rank/DB \u2500\u2500
+      # ── Box 2: Data type + Rank/DB ──
       tags$div(class = "sidebar-box",
         tags$div(class = "form-label", "Data type"),
         selectInput("mv_data_type", NULL,
@@ -4565,26 +4578,62 @@ server <- function(input, output, session) {
             selected = input$mv_rank_db))
       ),
 
-      # \u2500\u2500 Box 3: Metric + Distance/Normalization + N features + Exclude unclassified \u2500\u2500
+      # ── Box 3: Metric + Distance/Normalization + N features + Exclude unclassified ──
       tags$div(class = "sidebar-box",
         if (length(metrics) > 0) tagList(
-          tags$div(class = "form-label", "Metric"),
+          help_label("Metric",
+            paste0(
+              "Raw abundances: number of reads or features assigned. Not normalized — differences ",
+              "may reflect sequencing depth rather than biology.\n\n",
+              "Percentages: relative abundance as a fraction of the total. Removes sequencing depth bias ",
+              "but introduces compositionality (values sum to 100%).\n\n",
+              "TPM (Transcripts Per Million): normalized by feature length and sequencing depth. ",
+              "Suitable for comparing expression levels across samples.\n\n",
+              "Copy number: estimated number of copies of each feature per cell or genome equivalent. ",
+              "Useful for comparing functional gene abundance across samples with different genome sizes.\n\n",
+              "Base counts: total bases assigned to each feature. Proportional to both abundance and length."
+            )),
           selectInput("mv_metric", NULL, choices = metrics,
             selected = if (!is.null(input$mv_metric) && input$mv_metric %in% metrics)
               input$mv_metric
             else if ("abund" %in% metrics) "abund" else metrics[[1]])),
         if (is_pca) tagList(
-          tags$div(class = "form-label", style = "margin-top:4px;", "Normalization"),
+          help_label("Normalization",
+            paste0(
+              "CLR (Centered Log-Ratio): log-transforms relative abundances and centers them. ",
+              "Recommended for compositional metagenomics data — removes the total-sum constraint ",
+              "and makes data suitable for PCA.\n\n",
+              "Log10 + pseudocount: log10(x+1) transformation. Compresses dynamic range and reduces ",
+              "the influence of highly abundant features. Simpler than CLR but does not fully address compositionality.\n\n",
+              "Z-score: each feature is centered and scaled across samples independently. ",
+              "All features contribute equally regardless of abundance. Removes abundance information.\n\n",
+              "Raw: no transformation. PC1 may reflect sequencing depth rather than community composition. ",
+              "Only appropriate if data is already normalized (e.g. TPM, percentages)."
+            ), style = "margin-top:4px;"),
           selectInput("mv_norm", NULL,
             choices = c("CLR" = "clr",
                         "Log10 + pseudocount" = "log",
+                        "Z-score" = "zscore",
                         "Raw" = "raw"),
             selected = input$mv_norm %||% "clr")),
-        if (!is_pca) tagList(
-          tags$div(class = "form-label", style = "margin-top:4px;", "Distance"),
+        if (is_ca) tagList(
+          tags$div(style = "margin-top:4px; font-size:0.72rem; color:var(--muted);",
+            "CA works on raw counts — no normalization needed.")),
+        if (!is_pca && !is_ca) tagList(
+          help_label("Distance",
+            paste0(
+              "Bray-Curtis: standard ecological distance based on relative abundances. ",
+              "Recommended for most metagenomics datasets.\n\n",
+              "Jaccard: presence/absence version of Bray-Curtis. Ignores abundance, only considers ",
+              "which features are present or absent.\n\n",
+              "Hellinger: square root of relative abundances followed by Euclidean distance. ",
+              "Reduces the influence of dominant features.\n\n",
+              "Euclidean: straight-line distance on raw counts. Sensitive to total abundance differences ",
+              "— generally not recommended unless data is already normalized."
+            ), style = "margin-top:4px;"),
           selectInput("mv_dist", NULL,
-            choices = c("Bray-Curtis" = "bray", "Jaccard"    = "jaccard",
-                        "Hellinger"  = "hellinger", "Euclidean" = "euclidean"),
+            choices = c("Bray-Curtis" = "bray", "Jaccard" = "jaccard",
+                        "Hellinger" = "hellinger", "Euclidean" = "euclidean"),
             selected = input$mv_dist %||% "bray")),
         tags$div(class = "form-label", style = "margin-top:4px;", "Number of features"),
         numericInput("mv_n_features", NULL,
@@ -4679,24 +4728,25 @@ server <- function(input, output, session) {
       mat       <- mat[top_idx, , drop = FALSE]
       if (nrow(mat) < 2) stop("Not enough features after filtering.")
 
-      # \u2500\u2500 Normalization (PCA only \u2014 NMDS uses raw mat via distance metric) \u2500\u2500
+      # ── Normalization (PCA only — CA uses raw counts, NMDS uses distance metric) ──
       mat_t <- if (method == "pca") {
         norm <- input$mv_norm %||% "clr"
         t(switch(norm,
-          clr = { mat_ps <- mat + 1; apply(mat_ps, 2, function(x) log(x) - mean(log(x))) },
-          log = log10(mat + 1),
-          raw = mat
+          clr    = { mat_ps <- mat + 1; apply(mat_ps, 2, function(x) log(x) - mean(log(x))) },
+          log    = log10(mat + 1),
+          zscore = apply(mat, 1, function(x) { s <- sd(x); if (s == 0) rep(0, length(x)) else (x - mean(x)) / s }) |> t(),
+          raw    = mat
         ))
       } else {
-        t(mat)  # NMDS: raw counts, distance metric handles everything
+        t(mat)  # CA and NMDS: raw counts, samples as rows
       }  # samples as rows
 
       if (method == "pca") {
-        # \u2500\u2500 PCA via vegan::rda \u2500\u2500
+        # ── PCA via vegan::rda ──
         ord <- vegan::rda(mat_t, scale = FALSE)
         eig    <- ord$CA$eig
         var_ex <- round(100 * eig / sum(eig), 1)
-        # \u2500\u2500 PCA quality warnings \u2500\u2500
+        # ── PCA quality warnings ──
         pca_warns <- c()
         pc1    <- var_ex[1]
         pc1pc2 <- var_ex[1] + var_ex[2]
@@ -4717,6 +4767,9 @@ server <- function(input, output, session) {
         if (norm_used == "raw")
           pca_warns <- c(pca_warns,
             "Raw data (no normalization): PC1 may reflect sequencing depth differences rather than community composition. Consider using CLR or log normalization.")
+        if (norm_used == "zscore")
+          pca_warns <- c(pca_warns,
+            "Z-score normalization: each feature is scaled independently across samples. This removes abundance information and treats all features equally regardless of prevalence.")
 
         mv_pca_res(list(
           method     = "pca",
@@ -4724,6 +4777,32 @@ server <- function(input, output, session) {
           var_ex     = var_ex,
           mat_t      = mat_t,
           pca_warns  = if (length(pca_warns) > 0) pca_warns else NULL
+        ))
+
+      } else if (method == "ca") {
+        # ── CA via vegan::cca (unconstrained = CA) ──
+        # mat_t: samples as rows, features as columns; must be non-negative
+        if (any(mat_t < 0)) stop("CA requires non-negative counts. Use raw abundances or percentages.")
+        ord    <- vegan::cca(mat_t)
+        eig    <- ord$CA$eig
+        var_ex <- round(100 * eig / sum(eig), 1)
+        ca_warns <- c()
+        ca1ca2 <- var_ex[1] + var_ex[2]
+        if (nrow(mat_t) <= 2)
+          ca_warns <- c(ca_warns, "Only 2 samples: CA is trivial and results are not meaningful.")
+        if (ca1ca2 < 30)
+          ca_warns <- c(ca_warns,
+            paste0("CA1+CA2 explain only ", ca1ca2, "% of inertia: the biplot captures very little of the total variation."))
+        else if (ca1ca2 < 50)
+          ca_warns <- c(ca_warns,
+            paste0("CA1+CA2 explain ", ca1ca2, "% of inertia: less than half the total variation is represented."))
+
+        mv_pca_res(list(
+          method    = "ca",
+          ord       = ord,
+          var_ex    = var_ex,
+          mat_t     = mat_t,
+          pca_warns = if (length(ca_warns) > 0) ca_warns else NULL
         ))
 
       } else {
@@ -4816,6 +4895,43 @@ server <- function(input, output, session) {
         { if (show_fl)
             ggplot2::geom_text(data = df_sp,
               ggplot2::aes(x = PC1, y = PC2, label = feat),
+              size = fs / 4.5, colour = "#3b9ede", alpha = 0.8, hjust = 0.5, vjust = -0.5)
+          else ggplot2::geom_blank() } +
+        ggplot2::labs(x = xlab, y = ylab, title = title)
+
+    } else if (method == "ca") {
+      var_ex   <- res$var_ex
+      sc_sites <- vegan::scores(res$ord, display = "sites",   choices = 1:2)
+      sc_sp    <- vegan::scores(res$ord, display = "species", choices = 1:2)
+
+      df_sites <- data.frame(CA1 = sc_sites[,1], CA2 = sc_sites[,2],
+                              sample = rownames(sc_sites))
+      df_sp    <- data.frame(CA1 = sc_sp[,1],    CA2 = sc_sp[,2],
+                              feat = rownames(sc_sp))
+
+      scale_f <- 0.7 * max(abs(df_sites[,1:2])) / max(abs(df_sp[,1:2]))
+      df_sp$CA1 <- df_sp$CA1 * scale_f
+      df_sp$CA2 <- df_sp$CA2 * scale_f
+
+      xlab  <- paste0("CA1 (", var_ex[1], "%)")
+      ylab  <- paste0("CA2 (", var_ex[2], "%)")
+      title <- "CA biplot"
+
+      p <- ggplot2::ggplot() +
+        ggplot2::geom_hline(yintercept = 0, colour = "#cccccc", linewidth = 0.4) +
+        ggplot2::geom_vline(xintercept = 0, colour = "#cccccc", linewidth = 0.4) +
+        ggplot2::geom_segment(data = df_sp,
+          ggplot2::aes(x = 0, y = 0, xend = CA1, yend = CA2),
+          arrow = ggplot2::arrow(length = ggplot2::unit(0.15, "cm"), type = "closed"),
+          colour = "#3b9ede", alpha = 0.5, linewidth = 0.4) +
+        ggplot2::geom_point(data = df_sites,
+          ggplot2::aes(x = CA1, y = CA2), colour = "#e44c3a", size = 3) +
+        ggplot2::geom_text(data = df_sites,
+          ggplot2::aes(x = CA1, y = CA2, label = sample),
+          vjust = -0.8, size = fs / 3.5, colour = "#333333") +
+        { if (show_fl)
+            ggplot2::geom_text(data = df_sp,
+              ggplot2::aes(x = CA1, y = CA2, label = feat),
               size = fs / 4.5, colour = "#3b9ede", alpha = 0.8, hjust = 0.5, vjust = -0.5)
           else ggplot2::geom_blank() } +
         ggplot2::labs(x = xlab, y = ylab, title = title)
