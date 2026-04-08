@@ -8,15 +8,41 @@ library(plotly)
 
 # \u2500\u2500 Load COG/KEGG category files from SqueezeMeta data dir \u2500\u2500
 .find_sqm_data_file <- function(fname) {
-  candidates <- c(
-    file.path("/home/tamames/anaconda3/envs/SqueezeMeta-dev/SqueezeMeta/data", fname),
-    file.path(Sys.getenv("CONDA_PREFIX"), "SqueezeMeta", "data", fname),
-    file.path(dirname(Sys.getenv("CONDA_PREFIX")), "SqueezeMeta", "data", fname),
-    file.path("/home", Sys.info()[["user"]], "anaconda3", "envs",
-              basename(Sys.getenv("CONDA_PREFIX")), "SqueezeMeta", "data", fname),
-    file.path("/home", Sys.info()[["user"]], "miniconda3", "envs",
-              basename(Sys.getenv("CONDA_PREFIX")), "SqueezeMeta", "data", fname)
+  candidates <- c()
+
+  # 1. Active conda environment (works when launched from conda env)
+  conda_prefix <- Sys.getenv("CONDA_PREFIX")
+  if (nchar(conda_prefix) > 0)
+    candidates <- c(candidates,
+      file.path(conda_prefix, "SqueezeMeta", "data", fname),
+      file.path(dirname(conda_prefix), "SqueezeMeta", "data", fname))
+
+  # 2. Search all conda envs for all users (works when launched by shiny/root)
+  conda_roots <- c(
+    file.path(Sys.getenv("HOME"), "miniconda3", "envs"),
+    file.path(Sys.getenv("HOME"), "anaconda3", "envs"),
+    file.path(Sys.getenv("HOME"), "mambaforge", "envs"),
+    file.path(Sys.getenv("HOME"), "miniforge3", "envs"),
+    "/opt/miniconda3/envs", "/opt/anaconda3/envs", "/opt/conda/envs"
   )
+  # Also scan home directories of real users
+  user_homes <- tryCatch(
+    list.dirs(c("/home", "/root"), recursive = FALSE, full.names = TRUE),
+    error = function(e) character(0))
+  for (h in user_homes)
+    conda_roots <- c(conda_roots,
+      file.path(h, "miniconda3", "envs"),
+      file.path(h, "anaconda3", "envs"),
+      file.path(h, "mambaforge", "envs"),
+      file.path(h, "miniforge3", "envs"))
+
+  for (root in conda_roots[dir.exists(conda_roots)]) {
+    envs <- list.dirs(root, recursive = FALSE, full.names = TRUE)
+    for (env in envs)
+      candidates <- c(candidates,
+        file.path(env, "SqueezeMeta", "data", fname))
+  }
+
   found <- candidates[file.exists(candidates)]
   if (length(found) > 0) found[1] else NULL
 }
