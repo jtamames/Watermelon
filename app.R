@@ -1748,11 +1748,9 @@ ui <- page_navbar(
   nav_panel("Tables",
     layout_sidebar(
       sidebar = sidebar(width = 270,
-        uiOutput("tbl_assembly_ui"),
-        uiOutput("tbl_taxonomy_ui"),
-        uiOutput("tbl_functions_ui"),
-        uiOutput("tbl_bins_ui"),
-
+        uiOutput("tbl_category_ui"),
+        tags$hr(class = "section-divider"),
+        uiOutput("tbl_sub_controls_ui"),
         uiOutput("table_sample_filter"),
         tags$div(style = "margin-top:5px;",
           downloadButton("download_table", "Download CSV", class = "btn-outline-secondary w-100"))
@@ -1915,49 +1913,87 @@ server <- function(input, output, session) {
     )
   }
 
-  output$tbl_assembly_ui <- renderUI({
-    req(sqm_data())
-    ch <- avail_assembly(sqm_data())
-    make_table_box("Assembly", "tbl_assembly", ch)
-  })
-  output$tbl_taxonomy_ui <- renderUI({
+  output$tbl_category_ui <- renderUI({
     req(sqm_data()); proj <- sqm_data()
-    ch <- avail_taxonomy(proj)
-    if (length(ch) == 0) return(NULL)
-    # Default rank for metric detection
-    rank0 <- sub("^tax_", "", ch[[1]])
-    metrics <- avail_tax_metrics(proj, rank0)
-    tags$div(class = "sidebar-box", style = "margin-bottom:6px;",
-      tags$div(class = "form-label", "Taxonomy"),
-      selectInput("tbl_taxonomy", NULL, choices = ch),
-      tags$div(class = "form-label", style = "margin-top:4px;", "Metric"),
-      selectInput("tbl_tax_metric", NULL, choices = metrics,
-                  selected = if ("percent" %in% metrics) "percent" else metrics[[1]])
-    )
+    # Build available categories based on what data exists
+    cats <- c()
+    if (length(avail_assembly(proj)) > 0)  cats <- c(cats, "Assembly"  = "assembly")
+    if (length(avail_taxonomy(proj))  > 0)  cats <- c(cats, "Taxa"      = "taxonomy")
+    if (length(avail_functions(proj)) > 0)  cats <- c(cats, "Functions" = "functions")
+    if (length(avail_bins(proj))      > 0)  cats <- c(cats, "Bins"      = "bins")
+    if (length(cats) == 0) return(NULL)
+    cur <- isolate(input$tbl_category)
+    sel <- if (!is.null(cur) && cur %in% cats) cur else cats[[1]]
+    tags$div(class = "sidebar-box",
+      tags$div(class = "form-label", "Table type"),
+      selectInput("tbl_category", NULL, choices = cats, selected = sel))
   })
-  output$tbl_functions_ui <- renderUI({
-    req(sqm_data()); proj <- sqm_data()
-    ch <- avail_functions(proj)
-    if (length(ch) == 0) return(NULL)
-    db0 <- toupper(sub("^fun_", "", ch[[1]]))
-    metrics <- avail_fun_metrics(proj, db0)
-    tags$div(class = "sidebar-box", style = "margin-bottom:6px;",
-      tags$div(class = "form-label", "Functions"),
-      selectInput("tbl_functions", NULL, choices = ch),
-      tags$div(class = "form-label", style = "margin-top:4px;", "Metric"),
-      selectInput("tbl_fun_metric", NULL, choices = metrics,
-                  selected = if ("abund" %in% metrics) "abund" else metrics[[1]])
-    )
+
+  output$tbl_sub_controls_ui <- renderUI({
+    req(sqm_data(), input$tbl_category)
+    proj <- sqm_data()
+    cat  <- input$tbl_category
+
+    entries_selector <- tagList(
+      tags$div(class = "form-label", style = "margin-top:4px;", "Rows per page"),
+      selectInput("tbl_page_length", NULL,
+        choices  = c("10" = 10, "20" = 20, "50" = 50, "100" = 100, "All" = -1),
+        selected = isolate(input$tbl_page_length) %||% 20))
+
+    if (cat == "assembly") {
+      ch <- avail_assembly(proj)
+      if (length(ch) == 0) return(NULL)
+      tagList(
+        make_table_box("Table", "tbl_assembly", ch),
+        tags$div(class = "sidebar-box", entries_selector))
+
+    } else if (cat == "taxonomy") {
+      ch <- avail_taxonomy(proj)
+      if (length(ch) == 0) return(NULL)
+      rank0   <- sub("^tax_", "", ch[[1]])
+      metrics <- avail_tax_metrics(proj, rank0)
+      tags$div(class = "sidebar-box",
+        tags$div(class = "form-label", "Rank"),
+        selectInput("tbl_taxonomy", NULL, choices = ch),
+        tags$div(class = "form-label", style = "margin-top:4px;", "Metric"),
+        selectInput("tbl_tax_metric", NULL, choices = metrics,
+          selected = if ("percent" %in% metrics) "percent" else metrics[[1]]),
+        entries_selector)
+
+    } else if (cat == "functions") {
+      ch <- avail_functions(proj)
+      if (length(ch) == 0) return(NULL)
+      db0     <- toupper(sub("^fun_", "", ch[[1]]))
+      metrics <- avail_fun_metrics(proj, db0)
+      tags$div(class = "sidebar-box",
+        tags$div(class = "form-label", "Database"),
+        selectInput("tbl_functions", NULL, choices = ch),
+        tags$div(class = "form-label", style = "margin-top:4px;", "Metric"),
+        selectInput("tbl_fun_metric", NULL, choices = metrics,
+          selected = if ("abund" %in% metrics) "abund" else metrics[[1]]),
+        entries_selector)
+
+    } else if (cat == "bins") {
+      tags$div(class = "sidebar-box", entries_selector)
+    }
   })
-  output$tbl_bins_ui <- renderUI({
-    req(sqm_data())
-    if (length(avail_bins(sqm_data())) == 0) return(NULL)
-    tags$div(class = "sidebar-box", style = "margin-bottom:6px;",
-      tags$div(class = "form-label", "Bins"),
-      actionButton("tbl_bins_btn", "Bins table",
-        class = "btn-default w-100",
-        style = "font-size:0.75rem; font-family:'IBM Plex Sans',sans-serif; font-weight:400; height:26px; padding:2px 8px; text-align:left; letter-spacing:0;")
-    )
+
+  # When category changes, auto-load the default table for that category
+  observeEvent(input$tbl_category, ignoreInit = TRUE, {
+    proj <- sqm_data(); req(proj)
+    cat  <- input$tbl_category
+    if (cat == "assembly") {
+      ch <- avail_assembly(proj)
+      if (length(ch) > 0) do_load_table(ch[[1]])
+    } else if (cat == "taxonomy") {
+      ch <- avail_taxonomy(proj)
+      if (length(ch) > 0) do_load_table(ch[[1]])
+    } else if (cat == "functions") {
+      ch <- avail_functions(proj)
+      if (length(ch) > 0) do_load_table(ch[[1]])
+    } else if (cat == "bins") {
+      do_load_table("bins")
+    }
   })
 
   # \u2500\u2500 active_table: a reactiveVal updated by each selector.
@@ -1990,8 +2026,9 @@ server <- function(input, output, session) {
     updateSelectInput(session, "tbl_fun_metric", choices = metrics, selected = sel)
     do_load_table(input$tbl_functions)
   })
-  observeEvent(input$tbl_bins_btn, ignoreNULL=TRUE, ignoreInit=TRUE, {
-    do_load_table("bins")
+  observeEvent(input$tbl_page_length, ignoreNULL=TRUE, ignoreInit=TRUE, {
+    tt <- isolate(active_tbl_rv())
+    if (!is.null(tt) && tt != "none") do_load_table(tt)
   })
 
   # Initialise on project load
@@ -3402,8 +3439,10 @@ server <- function(input, output, session) {
       "  }",
       "}"
     ))
+    pl <- as.integer(isolate(input$tbl_page_length) %||% 20)
     datatable(df, rownames=FALSE,
-      options=list(pageLength=20, scrollX=TRUE, dom="lfrtip",
+      options=list(pageLength = if (pl == -1) nrow(df) else pl,
+                   scrollX=TRUE, dom="frtip",
                    rowCallback = fmt_callback),
       class="compact hover stripe")
   })
