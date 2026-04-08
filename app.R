@@ -223,6 +223,16 @@ body { background: var(--bg); color: var(--text); }
   letter-spacing: 0.04em;
 }
 .btn-primary:hover { background: #1558a0 !important; }
+.btn-primary.mv-stale {
+  background: transparent !important;
+  border: 2px solid #c0392b !important;
+  box-shadow: 0 0 0 1px rgba(192,57,43,0.4) !important;
+  color: #c0392b !important;
+}
+.btn-primary.mv-stale::after {
+  content: ' ↻';
+  font-size: 0.9em;
+}
 .btn-outline-secondary {
   border-color: var(--border) !important;
   color: var(--muted) !important;
@@ -1809,6 +1819,32 @@ ui <- page_navbar(
         uiOutput("mv_sidebar_controls"),
         tags$hr(class = "section-divider"),
         actionButton("do_pca", "Run analysis", class = "btn-primary w-100"),
+        tags$script(HTML("
+          (function() {
+            // Inputs that, when changed, mark the analysis as stale
+            var watchIds = [
+              'mv_method','mv_data_type','mv_rank_db','mv_metric',
+              'mv_norm','mv_dist','mv_n_features',
+              'mv_exclude_unclassified','mv_exclude_ambiguous','mv_samples'
+            ];
+            var btn = document.getElementById('do_pca');
+            function markStale() {
+              if (!btn) btn = document.getElementById('do_pca');
+              if (!btn) return;
+              btn.classList.add('mv-stale');
+            }
+            function markFresh() {
+              if (!btn) btn = document.getElementById('do_pca');
+              if (!btn) return;
+              btn.classList.remove('mv-stale');
+            }
+            // Watch Shiny input changes
+            $(document).on('shiny:inputchanged', function(e) {
+              if (watchIds.indexOf(e.name) !== -1) markStale();
+              if (e.name === 'do_pca') markFresh();
+            });
+          })();
+        ")),
         tags$div(style = "margin-top:5px;", uiOutput("mv_download_ui")),
         tags$div(style = "margin-top:10px;", uiOutput("mv_status_ui"))
       ),
@@ -1824,7 +1860,9 @@ ui <- page_navbar(
             numericInput("mv_plot_height", NULL, value = 500, min = 200, max = 1200, step = 50, width = "75px"),
             tags$div(style = "font-size:0.75rem; color:var(--muted); white-space:nowrap;", "Font:"),
             numericInput("mv_font_size",   NULL, value = 11,  min = 6,   max = 24,   step = 1,  width = "65px"),
-            uiOutput("mv_feat_labels_ui")
+            uiOutput("mv_feat_labels_ui"),
+            uiOutput("mv_ext_labels_ui"),
+            uiOutput("mv_feat_style_ui")
           ),
           uiOutput("mv_plot_ui")
         )
@@ -3518,8 +3556,12 @@ server <- function(input, output, session) {
         "background:var(--surface); color:var(--text);"))
 
     # Build tree HTML
+    # Exclude "1.0 Global and overview maps" — these are composite maps that
+    # cannot be rendered by pathview in the same way as individual pathway maps.
+    KEGG_HIERARCHY_EXCL_L2 <- "1.0 Global and overview maps"
     tree_items <- lapply(names(KEGG_HIERARCHY), function(l1) {
       l2_items <- lapply(names(KEGG_HIERARCHY[[l1]]), function(l2) {
+        if (l2 %in% KEGG_HIERARCHY_EXCL_L2) return(NULL)
         pathways <- KEGG_HIERARCHY[[l1]][[l2]]
         pw_links <- lapply(pathways, function(pw) {
           tags$div(
@@ -3547,8 +3589,9 @@ server <- function(input, output, session) {
           pw_links
         )
       })
+      l2_items <- Filter(Negate(is.null), l2_items)
       tags$details(
-        open = NA,  # start closed
+        open = NA,  # start open
         style = "margin-bottom:2px;",
         tags$summary(
           style = paste0(
@@ -4508,6 +4551,37 @@ server <- function(input, output, session) {
         "Feature labels"))
   })
 
+  output$mv_ext_labels_ui <- renderUI({
+    res <- mv_pca_res()
+    req(!is.null(res), !is.null(res$fun_names), input$mv_data_type == "functions",
+        input$mv_method %||% "pca" %in% c("pca", "ca"))
+    tags$div(style = "display:flex; align-items:center; gap:4px;",
+      tags$input(id = "mv_show_ext_labels", type = "checkbox",
+        style = "margin:0; width:13px; height:13px; cursor:pointer;",
+        checked = if (isTRUE(input$mv_show_ext_labels)) NA else NULL,
+        onclick = "Shiny.setInputValue('mv_show_ext_labels', this.checked, {priority:'event'});"),
+      tags$label(`for` = "mv_show_ext_labels",
+        style = "font-size:0.75rem; color:var(--muted); cursor:pointer; margin:0;",
+        "Extended labels"))
+  })
+
+  output$mv_feat_style_ui <- renderUI({
+    req(input$mv_method %||% "pca" %in% c("pca", "ca"))
+    tags$div(style = "display:flex; align-items:center; gap:4px;",
+      tags$span(style = "font-size:0.75rem; color:var(--muted); white-space:nowrap;", "Features:"),
+      tags$select(
+        id = "mv_feat_style",
+        style = paste0(
+          "font-size:0.75rem; height:24px; padding:1px 4px;",
+          "border:1px solid var(--border); border-radius:4px;",
+          "background:#ffffff; color:var(--text); cursor:pointer;"),
+        onchange = "Shiny.setInputValue('mv_feat_style', this.value, {priority:'event'});",
+        tags$option(value = "arrows", selected = if ((input$mv_feat_style %||% "arrows") == "arrows") NA else NULL, "Arrows"),
+        tags$option(value = "dots",   selected = if ((input$mv_feat_style %||% "arrows") == "dots")   NA else NULL, "Dots")
+      )
+    )
+  })
+
   output$mv_card_title_ui <- renderUI({
     method <- input$mv_method %||% "pca"
     span(switch(method, pca = "PCA", ca = "CA", nmds = "NMDS"))
@@ -4698,12 +4772,14 @@ server <- function(input, output, session) {
       excl_u  <- isTRUE(input$mv_exclude_unclassified)
       sel_smp <- input$mv_samples
 
-      # \u2500\u2500 Get matrix \u2500\u2500
+      # ── Get matrix ──
+      fun_names_vec <- NULL  # names lookup for functions data type
       mat <- if (input$mv_data_type == "taxonomy") {
         rank <- sub("^tax_", "", rdb)
         as.matrix(proj$taxa[[rank]][[metric]])
       } else {
         db <- toupper(sub("^fun_", "", rdb))
+        fun_names_vec <- tryCatch(proj$misc[[paste0(db, "_names")]], error = function(e) NULL)
         as.matrix(proj$functions[[db]][[metric]])
       }
 
@@ -4776,7 +4852,8 @@ server <- function(input, output, session) {
           ord        = ord,
           var_ex     = var_ex,
           mat_t      = mat_t,
-          pca_warns  = if (length(pca_warns) > 0) pca_warns else NULL
+          pca_warns  = if (length(pca_warns) > 0) pca_warns else NULL,
+          fun_names  = fun_names_vec
         ))
 
       } else if (method == "ca") {
@@ -4802,7 +4879,8 @@ server <- function(input, output, session) {
           ord       = ord,
           var_ex    = var_ex,
           mat_t     = mat_t,
-          pca_warns = if (length(ca_warns) > 0) ca_warns else NULL
+          pca_warns = if (length(ca_warns) > 0) ca_warns else NULL,
+          fun_names = fun_names_vec
         ))
 
       } else {
@@ -4842,7 +4920,8 @@ server <- function(input, output, session) {
           ord         = ord,
           mat_t       = mat_t,
           stress      = round(ord$stress, 4),
-          stress_warn = stress_warn
+          stress_warn = stress_warn,
+          fun_names   = fun_names_vec
         ))
       }
       mv_status("ready")
@@ -4856,10 +4935,22 @@ server <- function(input, output, session) {
   # \u2500\u2500 Plot \u2500\u2500
   mv_plot <- reactive({
     req(mv_pca_res(), mv_status() == "ready")
-    res     <- mv_pca_res()
-    method  <- res$method
-    fs      <- input$mv_font_size %||% 11
-    show_fl <- isTRUE(input$mv_show_feat_labels)
+    res      <- mv_pca_res()
+    method   <- res$method
+    fs       <- input$mv_font_size %||% 11
+    show_fl  <- isTRUE(input$mv_show_feat_labels)
+    show_ext <- isTRUE(input$mv_show_ext_labels)
+    feat_style <- input$mv_feat_style %||% "arrows"
+
+    # Build extended label lookup if available and requested
+    make_labels <- function(ids) {
+      if (show_ext && !is.null(res$fun_names) && length(res$fun_names) > 0) {
+        nms <- res$fun_names[ids]
+        ifelse(is.na(nms) | nms == "", ids, paste0(ids, ": ", nms))
+      } else {
+        ids
+      }
+    }
 
     if (method == "pca") {
       pca     <- res$ord
@@ -4870,7 +4961,7 @@ server <- function(input, output, session) {
       df_sites <- data.frame(PC1 = sc_sites[,1], PC2 = sc_sites[,2],
                               sample = rownames(sc_sites))
       df_sp    <- data.frame(PC1 = sc_sp[,1],    PC2 = sc_sp[,2],
-                              feat = rownames(sc_sp))
+                              feat = make_labels(rownames(sc_sp)))
 
       scale_f <- 0.7 * max(abs(df_sites[,1:2])) / max(abs(df_sp[,1:2]))
       df_sp$PC1 <- df_sp$PC1 * scale_f
@@ -4883,10 +4974,15 @@ server <- function(input, output, session) {
       p <- ggplot2::ggplot() +
         ggplot2::geom_hline(yintercept = 0, colour = "#cccccc", linewidth = 0.4) +
         ggplot2::geom_vline(xintercept = 0, colour = "#cccccc", linewidth = 0.4) +
-        ggplot2::geom_segment(data = df_sp,
-          ggplot2::aes(x = 0, y = 0, xend = PC1, yend = PC2),
-          arrow = ggplot2::arrow(length = ggplot2::unit(0.15, "cm"), type = "closed"),
-          colour = "#3b9ede", alpha = 0.5, linewidth = 0.4) +
+        { if (feat_style == "arrows")
+            ggplot2::geom_segment(data = df_sp,
+              ggplot2::aes(x = 0, y = 0, xend = PC1, yend = PC2),
+              arrow = ggplot2::arrow(length = ggplot2::unit(0.15, "cm"), type = "closed"),
+              colour = "#3b9ede", alpha = 0.5, linewidth = 0.4)
+          else
+            ggplot2::geom_point(data = df_sp,
+              ggplot2::aes(x = PC1, y = PC2),
+              colour = "#3b9ede", alpha = 0.6, size = 1.5) } +
         ggplot2::geom_point(data = df_sites,
           ggplot2::aes(x = PC1, y = PC2), colour = "#e44c3a", size = 3) +
         ggplot2::geom_text(data = df_sites,
@@ -4907,7 +5003,7 @@ server <- function(input, output, session) {
       df_sites <- data.frame(CA1 = sc_sites[,1], CA2 = sc_sites[,2],
                               sample = rownames(sc_sites))
       df_sp    <- data.frame(CA1 = sc_sp[,1],    CA2 = sc_sp[,2],
-                              feat = rownames(sc_sp))
+                              feat = make_labels(rownames(sc_sp)))
 
       scale_f <- 0.7 * max(abs(df_sites[,1:2])) / max(abs(df_sp[,1:2]))
       df_sp$CA1 <- df_sp$CA1 * scale_f
@@ -4920,10 +5016,15 @@ server <- function(input, output, session) {
       p <- ggplot2::ggplot() +
         ggplot2::geom_hline(yintercept = 0, colour = "#cccccc", linewidth = 0.4) +
         ggplot2::geom_vline(xintercept = 0, colour = "#cccccc", linewidth = 0.4) +
-        ggplot2::geom_segment(data = df_sp,
-          ggplot2::aes(x = 0, y = 0, xend = CA1, yend = CA2),
-          arrow = ggplot2::arrow(length = ggplot2::unit(0.15, "cm"), type = "closed"),
-          colour = "#3b9ede", alpha = 0.5, linewidth = 0.4) +
+        { if (feat_style == "arrows")
+            ggplot2::geom_segment(data = df_sp,
+              ggplot2::aes(x = 0, y = 0, xend = CA1, yend = CA2),
+              arrow = ggplot2::arrow(length = ggplot2::unit(0.15, "cm"), type = "closed"),
+              colour = "#3b9ede", alpha = 0.5, linewidth = 0.4)
+          else
+            ggplot2::geom_point(data = df_sp,
+              ggplot2::aes(x = CA1, y = CA2),
+              colour = "#3b9ede", alpha = 0.6, size = 1.5) } +
         ggplot2::geom_point(data = df_sites,
           ggplot2::aes(x = CA1, y = CA2), colour = "#e44c3a", size = 3) +
         ggplot2::geom_text(data = df_sites,
