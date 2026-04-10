@@ -1704,8 +1704,8 @@ ui <- page_navbar(
         ),
         uiOutput("plot_controls_ui"),
         tags$div(style = "margin-top:5px;",
-        uiOutput("plot_sample_selector_ui"),
-          downloadButton("download_plot", "Download PNG", class = "btn-outline-secondary w-100"))
+        uiOutput("plot_sample_selector_ui")),
+        uiOutput("plot_download_ui")
       ),
       card(
         card_header(div(style = "display:flex; justify-content:space-between; align-items:center;",
@@ -3399,26 +3399,44 @@ server <- function(input, output, session) {
     if (is.null(sqm_data())) tags$span(class="badge",style="background:#eef2f7;color:#7a90a8;font-size:0.72rem;border:1px solid #d0dae6;","No project")
     else tags$span(class="badge",style="background:rgba(26,158,110,0.1);color:#1a9e6e;font-size:0.72rem;border:1px solid rgba(26,158,110,0.3);","\u25cf Ready")
   })
+  output$plot_download_ui <- renderUI({
+    req(sqm_data())
+    pt <- input$plot_type %||% ""
+    is_plotly <- pt == "taxonomy_bar" || pt == "taxonomy_heatmap" ||
+                 startsWith(pt, "func_") || pt == "cog_class" || pt == "kegg_class"
+    if (is_plotly) {
+      plot_id <- switch(pt,
+        taxonomy_bar     = "sqm_tax_plot",
+        taxonomy_heatmap = "sqm_tax_hm_plot",
+        cog_class        = "sqm_cog_class_plot",
+        kegg_class       = "sqm_kegg_class_plot",
+        "sqm_func_plot")
+      tags$div(style = "margin-top:5px;",
+        tags$button(
+          class = "btn btn-outline-secondary w-100",
+          style = "font-size:0.82rem;",
+          onclick = sprintf(paste0(
+            "var gd = document.querySelector('#%s');",
+            "if (!gd || !gd._fullLayout) { alert('Plot not ready'); return; }",
+            "Plotly.toImage(gd, {format:'png', width: gd._fullLayout.width, height: gd._fullLayout.height, scale:2}).then(function(url){",
+            "  var a = document.createElement('a');",
+            "  a.href = url; a.download = 'sqm_plot.png'; a.click();",
+            "});"), plot_id),
+          "Download PNG"))
+    } else {
+      tags$div(style = "margin-top:5px;",
+        downloadButton("download_plot", "Download PNG", class = "btn-outline-secondary w-100"))
+    }
+  })
+
   output$download_plot <- downloadHandler(
-    filename = function() paste0("sqm_plot_",Sys.Date(),".png"),
+    filename = function() paste0("sqm_plot_", Sys.Date(), ".png"),
     content  = function(file) {
-      pt         <- isolate(input$plot_type)
-      is_tax     <- !is.null(pt) && pt == "taxonomy_bar"
-      is_tax_hm  <- !is.null(pt) && pt == "taxonomy_heatmap"
-      is_func    <- !is.null(pt) && (startsWith(pt, "func_") || pt == "cog_class" || pt == "kegg_class")
-      w <- if (is_tax)     isolate(input$tax_plot_width  %||% 800)
-           else if (is_func)   isolate(input$func_plot_width  %||% 1200)
-           else if (is_tax_hm) isolate(input$tax_hm_width    %||% 1200)
-           else 1400
-      h <- if (is_tax)     isolate(input$tax_plot_height %||% 560)
-           else if (is_func)   isolate(input$func_plot_height %||% 560)
-           else if (is_tax_hm) isolate(input$tax_hm_height   %||% 560)
-           else 900
-      if (is_tax || is_func || is_tax_hm) {
-        showNotification("Use the Plotly camera ◷ button to save this plot.", type="message", duration=5)
-      } else {
-        png(file, width=w, height=h, res=150, bg="#ffffff"); print(plot_reactive()); dev.off()
-      }
+      w <- isolate(input$tax_plot_width  %||% 800)
+      h <- isolate(input$tax_plot_height %||% 560)
+      png(file, width = w, height = h, res = 150, bg = "#ffffff")
+      print(plot_reactive())
+      dev.off()
     }
   )
   output$table_sample_filter <- renderUI({
@@ -4623,10 +4641,26 @@ server <- function(input, output, session) {
   })
 
   output$download_pw_zip <- downloadHandler(
-    filename = function() paste0("pathway_", trimws(input$pw_pathway_id), "_", Sys.Date(), ".zip"),
-    content  = function(file) {
+    filename = function() {
+      imgs <- pw_img_files()
+      pid  <- trimws(input$pw_pathway_id)
+      if (!is.null(imgs) && length(imgs) == 1)
+        paste0("pathway_", pid, "_", Sys.Date(), ".png")
+      else
+        paste0("pathway_", pid, "_", Sys.Date(), ".zip")
+    },
+    content = function(file) {
       imgs <- pw_img_files(); req(imgs)
-      zip(file, files = imgs, flags = "-j")  # -j: junk paths, filenames only
+      if (length(imgs) == 1) {
+        file.copy(imgs[1], file)
+      } else {
+        tmp_dir <- tempfile()
+        dir.create(tmp_dir)
+        file.copy(imgs, tmp_dir)
+        old_wd <- setwd(tmp_dir)
+        on.exit({ setwd(old_wd); unlink(tmp_dir, recursive = TRUE) })
+        utils::zip(zipfile = file, files = basename(imgs))
+      }
     }
   )
 
