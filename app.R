@@ -4659,7 +4659,9 @@ server <- function(input, output, session) {
         file.copy(imgs, tmp_dir)
         old_wd <- setwd(tmp_dir)
         on.exit({ setwd(old_wd); unlink(tmp_dir, recursive = TRUE) })
-        utils::zip(zipfile = file, files = basename(imgs))
+        zip_cmd <- Sys.which("zip")
+        if (nchar(zip_cmd) == 0) zip_cmd <- "/usr/bin/zip"
+        utils::zip(zipfile = file, files = basename(imgs), zip = zip_cmd)
       }
     }
   )
