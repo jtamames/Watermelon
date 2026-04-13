@@ -1,4 +1,4 @@
-# SQMxplore
+# Watermelon
 
 Interactive Shiny dashboard for visualizing and exploring [SqueezeMeta](https://github.com/jtamames/SqueezeMeta) metagenomics results.
 
@@ -89,7 +89,7 @@ BiocManager::install("pathview")
 
 The Pathways tab requires an **internet connection** at generation time — `pathview` downloads the pathway map image from the KEGG servers on each run.
 
-`ggpattern` and `magick` are **not required**. SQMxplore generates its own inline color scale legend. Do not attempt to install `ggpattern` — it depends on `sf` → `s2` / `units`, which require system GIS libraries (GDAL, PROJ) that are rarely available in conda environments.
+`ggpattern` and `magick` are **not required**. Watermelon generates its own inline color scale legend. Do not attempt to install `ggpattern` — it depends on `sf` → `s2` / `units`, which require system GIS libraries (GDAL, PROJ) that are rarely available in conda environments.
 
 ### KronaTools (optional, required for Krona tab)
 
@@ -99,7 +99,7 @@ If SqueezeMeta is already installed in your environment, KronaTools is likely al
 which ktImportText
 ```
 
-If it prints a path, no further action is needed. SQMxplore detects it automatically.
+If it prints a path, no further action is needed. Watermelon detects it automatically.
 
 If it is not available, install it manually (recommended over conda if you are having network issues):
 
@@ -125,8 +125,8 @@ ktUpdateTaxonomy.sh
 Clone this repository:
 
 ```bash
-git clone https://github.com/jtamames/SQMxplore.git
-cd SQMxplore
+git clone https://github.com/jtamames/Watermelon.git
+cd Watermelon
 ```
 
 ---
@@ -298,7 +298,7 @@ Ordination analysis on taxonomy or functional abundance data. Requires the `vega
 
 ## Server deployment (remote access)
 
-This section explains how to make SQMxplore accessible to remote users via **Shiny Server**, running permanently on a Linux machine.
+This section explains how to make Watermelon accessible to remote users via **Shiny Server**, running permanently on a Linux machine.
 
 ### 1. Install R packages on the server
 
@@ -331,8 +331,8 @@ sudo dpkg -i shiny-server-1.5.21.1012-amd64.deb
 ### 3. Deploy the app
 
 ```bash
-sudo mkdir -p /srv/shiny-server/sqmxplore
-sudo cp /path/to/app.R /srv/shiny-server/sqmxplore/
+sudo mkdir -p /srv/shiny-server/watermelon
+sudo cp /path/to/app.R /srv/shiny-server/watermelon/
 ```
 
 ### 4. Configure Shiny Server
@@ -345,8 +345,8 @@ run_as shiny;
 server {
   listen 3838;
 
-  location /sqmxplore {
-    app_dir /srv/shiny-server/sqmxplore;
+  location /watermelon {
+    app_dir /srv/shiny-server/watermelon;
     log_dir /var/log/shiny-server;
   }
 }
@@ -391,7 +391,7 @@ sudo ufw allow 3838/tcp
 Users on the same network can now open:
 
 ```
-http://<server-ip>:3838/sqmxplore
+http://<server-ip>:3838/watermelon
 ```
 
 To find the server IP: `hostname -I`
@@ -408,7 +408,7 @@ The remote user runs this on their own machine:
 ssh -L 3838:localhost:3838 user@server-ip
 ```
 
-Then opens `http://localhost:3838/sqmxplore` in their browser. No firewall changes needed beyond standard SSH access.
+Then opens `http://localhost:3838/watermelon` in their browser. No firewall changes needed beyond standard SSH access.
 
 ### Option B: nginx reverse proxy with HTTPS (permanent, production)
 
@@ -416,15 +416,15 @@ Then opens `http://localhost:3838/sqmxplore` in their browser. No firewall chang
 sudo apt-get install -y nginx certbot python3-certbot-nginx
 ```
 
-Create `/etc/nginx/sites-available/sqmxplore`:
+Create `/etc/nginx/sites-available/watermelon`:
 
 ```nginx
 server {
     listen 80;
-    server_name sqmxplore.yourdomain.org;
+    server_name watermelon.yourdomain.org;
 
-    location /sqmxplore/ {
-        proxy_pass http://localhost:3838/sqmxplore/;
+    location /watermelon/ {
+        proxy_pass http://localhost:3838/watermelon/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -435,12 +435,12 @@ server {
 ```
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/sqmxplore /etc/nginx/sites-enabled/
+sudo ln -s /etc/nginx/sites-available/watermelon /etc/nginx/sites-enabled/
 sudo systemctl restart nginx
-sudo certbot --nginx -d sqmxplore.yourdomain.org
+sudo certbot --nginx -d watermelon.yourdomain.org
 ```
 
-Users then access `https://sqmxplore.yourdomain.org/sqmxplore`.
+Users then access `https://watermelon.yourdomain.org/watermelon`.
 
 ### Option C: ngrok (quick demo, no domain needed)
 
@@ -469,9 +469,9 @@ sudo chmod -R o+rX /path/to/sqm/project
 
 **`app_cache` permission errors in the log**
 
-If the log shows repeated warnings about `/srv/shiny-server/sqmxplore/app_cache`, fix ownership:
+If the log shows repeated warnings about `/srv/shiny-server/watermelon/app_cache`, fix ownership:
 ```bash
-sudo chown -R shiny:shiny /srv/shiny-server/sqmxplore/
+sudo chown -R shiny:shiny /srv/shiny-server/watermelon/
 sudo systemctl restart shiny-server
 ```
 
