@@ -1,5 +1,5 @@
 #!/bin/bash
-# SQMxplore installer
+# Watermelon installer
 # Installs all R dependencies inside the active conda environment
 # Usage:
 #   conda activate SqueezeMeta
@@ -8,7 +8,7 @@
 set -e
 
 echo "============================================"
-echo " SQMxplore dependency installer"
+echo " Watermelon dependency installer"
 echo "============================================"
 echo ""
 
@@ -36,7 +36,7 @@ echo ""
 
 # ── 1. System libraries ────────────────────────
 if command -v apt-get &> /dev/null; then
-  echo "[1/4] Installing system libraries..."
+  echo "[1/3] Installing system libraries..."
   sudo apt-get install -y \
     cmake zip \
     libcurl4-openssl-dev libssl-dev libxml2-dev \
@@ -45,29 +45,19 @@ if command -v apt-get &> /dev/null; then
     || echo "  (skipped — no sudo access)"
   echo "  ✓ System libraries done"
 else
-  echo "[1/4] Skipping system libraries (apt-get not available)"
+  echo "[1/3] Skipping system libraries (apt-get not available)"
 fi
 echo ""
 
-# ── 2. R packages (conda-forge) ───────────────
-# Install core packages via conda-forge to avoid compilation issues
-echo "[2/4] Installing R packages via conda-forge..."
-conda install -y -c conda-forge \
-  r-shiny r-shinyjs r-shinyfiles r-bslib r-dt r-plotly \
-  r-sqmtools r-vegan r-ggplot2 r-htmlwidgets r-xml2 \
-  2>/dev/null || echo "  (some packages may have failed, will retry via CRAN)"
-echo "  ✓ conda-forge packages done"
-echo ""
-
-# ── 3. R packages (CRAN fallback) ─────────────
-echo "[3/4] Checking and installing any missing R packages from CRAN..."
+# ── 2. R packages (CRAN) ───────────────────────
+echo "[2/3] Installing R packages from CRAN..."
 Rscript -e "
   repos <- 'https://cran.rstudio.com/'
   pkgs <- c('shiny', 'shinyjs', 'shinyFiles', 'bslib', 'DT', 'plotly',
             'SQMtools', 'vegan', 'ggplot2', 'htmlwidgets', 'xml2')
   missing <- pkgs[!sapply(pkgs, requireNamespace, quietly = TRUE)]
   if (length(missing) > 0) {
-    cat('  Installing via CRAN:', paste(missing, collapse=', '), '\n')
+    cat('  Installing:', paste(missing, collapse=', '), '\n')
     install.packages(missing, repos=repos)
     still_missing <- missing[!sapply(missing, requireNamespace, quietly = TRUE)]
     if (length(still_missing) > 0)
@@ -76,11 +66,11 @@ Rscript -e "
     cat('  All CRAN packages already installed\n')
   }
 "
-echo "  ✓ R packages done"
+echo "  ✓ CRAN packages installed"
 echo ""
 
-# ── 4. R packages (Bioconductor) ──────────────
-echo "[4/4] Installing Bioconductor packages (pathview, Biostrings)..."
+# ── 3. R packages (Bioconductor) ──────────────
+echo "[3/3] Installing Bioconductor packages (pathview, Biostrings)..."
 Rscript -e "
   if (!requireNamespace('BiocManager', quietly=TRUE))
     install.packages('BiocManager', repos='https://cran.rstudio.com/')
