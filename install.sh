@@ -55,6 +55,21 @@ CMAKE_DIR=$(dirname "$(which cmake 2>/dev/null || find /usr -name cmake -type f 
 if [ -n "$CMAKE_DIR" ] && [ "$CMAKE_DIR" != "." ]; then
   export PATH="$PATH:$CMAKE_DIR"
 fi
+
+# Fix liblzma: conda's cross-compiler looks for it inside the conda env
+# but it's only available system-wide — create a symlink if missing
+if [ ! -f "$CONDA_PREFIX/lib/liblzma.so" ]; then
+  LZMA_SYS=$(find /usr/lib -name "liblzma.so*" 2>/dev/null | head -1)
+  if [ -n "$LZMA_SYS" ]; then
+    ln -sf "$LZMA_SYS" "$CONDA_PREFIX/lib/liblzma.so" 2>/dev/null || true
+  fi
+fi
+if [ ! -f "$CONDA_PREFIX/lib/liblzma.a" ]; then
+  LZMA_A=$(find /usr/lib -name "liblzma.a" 2>/dev/null | head -1)
+  if [ -n "$LZMA_A" ]; then
+    ln -sf "$LZMA_A" "$CONDA_PREFIX/lib/liblzma.a" 2>/dev/null || true
+  fi
+fi
 echo ""
 
 # ── 2. R packages (CRAN) ───────────────────────
