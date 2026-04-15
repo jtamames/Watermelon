@@ -49,8 +49,12 @@ else
   echo "[1/3] Skipping system libraries (apt-get not available)"
 fi
 
-# Make sure cmake is in PATH (may be installed but not visible inside conda env)
-export PATH="/usr/bin:/usr/local/bin:$PATH"
+# Make cmake visible without overriding conda's R
+# Find cmake location and add only that directory
+CMAKE_DIR=$(dirname "$(which cmake 2>/dev/null || find /usr -name cmake -type f 2>/dev/null | head -1)")
+if [ -n "$CMAKE_DIR" ] && [ "$CMAKE_DIR" != "." ]; then
+  export PATH="$PATH:$CMAKE_DIR"
+fi
 echo ""
 
 # ── 2. R packages (CRAN) ───────────────────────
