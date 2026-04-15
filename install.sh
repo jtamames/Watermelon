@@ -71,7 +71,7 @@ echo "[3/3] Installing Bioconductor packages (pathview, Biostrings)..."
 Rscript -e "
   if (!requireNamespace('BiocManager', quietly=TRUE))
     install.packages('BiocManager', repos='https://cran.rstudio.com/')
-  BiocManager::install(version = '3.22', ask = FALSE, update = FALSE)
+  BiocManager::install(ask = FALSE, update = FALSE)
   pkgs <- c('pathview', 'Biostrings')
   missing <- pkgs[!sapply(pkgs, requireNamespace, quietly = TRUE)]
   if (length(missing) > 0) {
