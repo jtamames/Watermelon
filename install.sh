@@ -41,16 +41,16 @@ if command -v apt-get &> /dev/null; then
     cmake zip \
     libcurl4-openssl-dev libssl-dev libxml2-dev \
     libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
-    libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev 2>/dev/null \
+    libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev \
+    liblzma-dev 2>/dev/null \
     || echo "  (skipped — no sudo access)"
   echo "  ✓ System libraries done"
 else
   echo "[1/3] Skipping system libraries (apt-get not available)"
 fi
 
-# Ensure cmake and xz (liblzma) are available inside the conda environment
-echo "  Checking conda dependencies (cmake, xz)..."
-conda install -y -c conda-forge cmake xz 2>/dev/null || true
+# Make sure cmake is in PATH (may be installed but not visible inside conda env)
+export PATH="/usr/bin:/usr/local/bin:$PATH"
 echo ""
 
 # ── 2. R packages (CRAN) ───────────────────────
