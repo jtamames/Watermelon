@@ -47,6 +47,10 @@ if command -v apt-get &> /dev/null; then
 else
   echo "[1/3] Skipping system libraries (apt-get not available)"
 fi
+
+# Ensure cmake and xz (liblzma) are available inside the conda environment
+echo "  Checking conda dependencies (cmake, xz)..."
+conda install -y -c conda-forge cmake xz 2>/dev/null || true
 echo ""
 
 # ── 2. R packages (CRAN) ───────────────────────
