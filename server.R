@@ -641,6 +641,69 @@ server <- function(input, output, session) {
     if (!is.null(samples)) panels[["samples"]] <- sqm_section("Samples",
       tags$div(style="padding-top:2px;", tagList(lapply(samples,function(s) tags$span(class="project-badge",s)))))
 
+    # ── Mapping stats: replace READS panel with 10.<project>.mappingstat ──
+    mapping_panel <- tryCatch({
+      proj_dir <- path_project()
+      if (!is.null(proj_dir) && nchar(proj_dir) > 0) {
+        search_dirs <- c(proj_dir, file.path(proj_dir, "results"))
+        mstat_files <- unlist(lapply(search_dirs, function(d)
+          list.files(d, pattern="^10\\..*\\.mappingstat$", full.names=TRUE)))
+        if (length(mstat_files) > 0) {
+          lines <- readLines(mstat_files[[1]], warn=FALSE)
+          header_line <- lines[grepl("^#\\s*Sample", lines)]
+          data_lines  <- lines[!grepl("^#", lines) & nchar(trimws(lines)) > 0]
+          if (length(header_line) > 0 && length(data_lines) >= 1) {
+            raw_header <- trimws(unlist(strsplit(sub("^#\\s*", "", header_line[[1]]), "\t")))
+            col_rename <- c(
+              "Sample"       = "Sample",
+              "Total reads"  = "Total reads",
+              "Mapped reads" = "Mapped reads",
+              "Mapping perc" = "Mapping percentage",
+              "Total bases"  = "Total bases"
+            )
+            header <- sapply(raw_header, function(h) {
+              if (h %in% names(col_rename)) col_rename[[h]] else h
+            }, USE.NAMES = FALSE)
+            rows <- lapply(data_lines, function(l) trimws(unlist(strsplit(l, "\t"))))
+            pct_col <- which(raw_header == "Mapping perc")
+            if (length(pct_col) == 0) pct_col <- 4
+            mapping_pcts <- suppressWarnings(as.numeric(sapply(rows,
+              function(r) if (length(r) >= pct_col) r[[pct_col]] else NA)))
+            low_mapping <- any(!is.na(mapping_pcts) & mapping_pcts < 50)
+            th <- paste0("<th>", header, "</th>", collapse="")
+            tr_rows <- sapply(rows, function(r) {
+              cells <- sapply(seq_along(r), function(i) {
+                v <- r[[i]]
+                n <- suppressWarnings(as.numeric(v))
+                style <- ""
+                if (i == pct_col && !is.na(n) && n < 50)
+                  style <- ' style="color:#c0392b; font-weight:600;"'
+                if (!is.na(n) && i > 1 && !grepl("\\.", v))
+                  v <- format(n, big.mark=",", scientific=FALSE)
+                paste0("<td", style, ">", v, "</td>")
+              })
+              paste0("<tr>", paste(cells, collapse=""), "</tr>")
+            })
+            warning_tag <- if (low_mapping)
+              tags$div(style="color:#c0392b; font-size:0.8rem; margin-top:6px; font-weight:600;",
+                "\u26a0 Some samples have mapping percentage below 50%")
+            else NULL
+            tagList(
+              HTML(paste0(
+                '<table class="sqm-table">',
+                '<thead><tr>', th, '</tr></thead>',
+                '<tbody>', paste(tr_rows, collapse=""), '</tbody>',
+                '</table>'
+              )),
+              warning_tag
+            )
+          }
+        }
+      }
+    }, error=function(e) NULL)
+    if (!is.null(mapping_panel))
+      panels[["READS"]] <- sqm_section("Mapping statistics", mapping_panel)
+
     tagList(panels)
   })
   output$plot_controls_ui <- renderUI({
