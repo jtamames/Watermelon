@@ -10,7 +10,6 @@ Interactive Shiny dashboard for visualizing and exploring [SqueezeMeta](https://
 - **Krona** — generates and displays interactive Krona taxonomy charts inline, with per-sample filtering and HTML download
 - **Pathways** — overlays functional abundance data onto KEGG pathway maps using `exportPathway` from SQMtools; supports per-sample coloring, log scale, fold-change between sample groups, and hierarchical pathway browser with search
 - **Multivariate** — ordination analysis (PCA and NMDS) on taxonomy or functional abundance data, with multiple normalization and distance options, quality warnings, and interactive biplot
-- **Comparison** — statistical comparison between two sample groups (Wilcoxon, DESeq2, edgeR) with volcano plot and results table
 
 ---
 
@@ -170,14 +169,6 @@ Ordination analysis on taxonomy or functional abundance data.
 - Raw normalization selected (risk of sequencing depth artefact)
 - NMDS stress >0.2 (ordination may not be reliable)
 
-### Comparison
-Statistical comparison of functional or taxonomic profiles between two user-defined sample groups.
-
-- Define Group A and Group B by selecting samples from checkboxes
-- Choose method: Wilcoxon rank-sum, DESeq2, or edgeR
-- Results shown as an interactive volcano plot and a sortable table with per-sample abundance columns
-- Download results as CSV
-
 ---
 
 ## Dependencies summary
@@ -194,8 +185,6 @@ Statistical comparison of functional or taxonomic profiles between two user-defi
 | vegan | CRAN | Multivariate tab |
 | xml2 | CRAN | Pathways tab |
 | pathview | Bioconductor | Pathways tab |
-| DESeq2 | Bioconductor | Comparison tab (optional) |
-| edgeR | Bioconductor | Comparison tab (optional) |
 | KronaTools (`ktImportText`) | conda / GitHub | Krona tab |
 
 ---
