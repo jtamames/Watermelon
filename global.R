@@ -498,6 +498,13 @@ avail_bins <- function(proj) {
   tbl <- tryCatch(proj$bins$table, error = function(e) NULL)
   if (has_data(tbl)) c("Bins" = "bins") else c()
 }
+# Resolve a DB name from a lowercased selector value to the actual key in proj$functions
+# e.g. "greening" -> "Greening", "cog" -> "COG", "kegg" -> "KEGG"
+resolve_db_name <- function(proj, db_lower) {
+  dbs <- tryCatch(names(proj$functions), error = function(e) character(0))
+  match <- dbs[tolower(dbs) == tolower(db_lower)]
+  if (length(match) > 0) match[[1]] else toupper(db_lower)
+}
 avail_tax_metrics <- function(proj, rank) {
   all_m <- c("Percentages" = "percent",
              "Raw abundances" = "abund")

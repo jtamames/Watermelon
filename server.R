@@ -8,12 +8,70 @@ server <- function(input, output, session) {
   is_sqm_full  <- reactiveVal(FALSE)
 
   # ── Dynamic plot type selector ──
+  output$plot_category_ui <- renderUI({
+    proj <- sqm_data()
+    cats <- c()
+    if (!is.null(proj)) {
+      has_tax <- any(sapply(c("phylum","class","order","family","genus","species"), function(r)
+        tryCatch(has_data(proj$taxa[[r]]$percent), error = function(e) FALSE)))
+      if (has_tax) cats <- c(cats, "Taxonomy" = "taxonomy")
+      dbs <- tryCatch(names(proj$functions), error = function(e) character(0))
+      has_fun <- any(sapply(dbs, function(db)
+        tryCatch(has_data(proj$functions[[db]]$abund), error = function(e) FALSE)))
+      if (has_fun) cats <- c(cats, "Functions" = "functions")
+      if (tryCatch(has_data(proj$bins$table), error = function(e) FALSE))
+        cats <- c(cats, "MAGs" = "bins")
+    } else {
+      cats <- c("Taxonomy" = "taxonomy")
+    }
+    cur <- isolate(input$plot_category)
+    sel <- if (!is.null(cur) && cur %in% cats) cur else cats[[1]]
+    selectInput("plot_category", NULL, choices = cats, selected = sel)
+  })
+
   output$plot_type_ui <- renderUI({
     proj <- sqm_data()
-    choices <- if (is.null(proj)) c("Taxonomy" = "taxonomy_bar") else available_plot_types(proj)
-    cur      <- isolate(input$plot_type)
-    selected <- if (!is.null(cur) && cur %in% choices) cur else choices[[1]]
-    selectInput("plot_type", NULL, choices = choices, selected = selected)
+    cat  <- input$plot_category %||% "taxonomy"
+    choices <- if (cat == "taxonomy") {
+      c("Barplot" = "taxonomy_bar", "Heatmap" = "taxonomy_heatmap")
+    } else if (cat == "functions") {
+      ch <- c()
+      if (!is.null(proj)) {
+        dbs <- tryCatch(names(proj$functions), error = function(e) character(0))
+        for (db in dbs) {
+          tbl <- tryCatch(proj$functions[[db]]$abund, error = function(e) NULL)
+          if (has_data(tbl)) {
+            ch <- c(ch, setNames(paste0("func_", tolower(db)), db))
+            if (toupper(db) == "COG"  && !is.null(COG_CATEGORIES)  && nrow(COG_CATEGORIES)  > 0)
+              ch <- c(ch, "COG (functional classes)" = "cog_class")
+            if (toupper(db) == "KEGG" && !is.null(KEGG_CATEGORIES) && nrow(KEGG_CATEGORIES) > 0)
+              ch <- c(ch, "KEGG (functional classes)" = "kegg_class")
+          }
+        }
+      }
+      if (length(ch) == 0) ch <- c("(no data)" = "none")
+      ch
+    } else {
+      c("MAGs" = "bins")
+    }
+    cur <- isolate(input$plot_type)
+    sel <- if (!is.null(cur) && cur %in% choices) cur else choices[[1]]
+    selectInput("plot_type", NULL, choices = choices, selected = sel)
+  })
+
+  # When category changes, reset plot_type to first valid option
+  observeEvent(input$plot_category, ignoreInit = TRUE, {
+    proj <- sqm_data()
+    cat  <- input$plot_category %||% "taxonomy"
+    new_pt <- if (cat == "taxonomy") "taxonomy_bar"
+              else if (cat == "bins") "bins"
+              else if (cat == "functions" && !is.null(proj)) {
+                dbs <- tryCatch(names(proj$functions), error = function(e) character(0))
+                first <- Filter(function(db)
+                  tryCatch(has_data(proj$functions[[db]]$abund), error = function(e) FALSE), dbs)
+                if (length(first) > 0) paste0("func_", tolower(first[[1]])) else "none"
+              } else "none"
+    updateSelectInput(session, "plot_type", selected = new_pt)
   })
 
   # Show/hide format bars based on plot type
@@ -80,27 +138,27 @@ server <- function(input, output, session) {
     } else if (cat == "taxonomy") {
       ch <- avail_taxonomy(proj)
       if (length(ch) == 0) return(NULL)
-      rank0   <- sub("^tax_", "", ch[[1]])
+      rank0   <- if (length(ch) > 0) sub("^tax_", "", ch[[1]]) else ""
       metrics <- avail_tax_metrics(proj, rank0)
       tags$div(class = "sidebar-box",
         tags$div(class = "form-label", "Rank"),
         selectInput("tbl_taxonomy", NULL, choices = ch),
         tags$div(class = "form-label", style = "margin-top:4px;", "Metric"),
         selectInput("tbl_tax_metric", NULL, choices = metrics,
-          selected = if ("percent" %in% metrics) "percent" else metrics[[1]]),
+          selected = if (length(metrics) == 0) NULL else if ("percent" %in% metrics) "percent" else metrics[[1]]),
         entries_selector)
 
     } else if (cat == "functions") {
       ch <- avail_functions(proj)
       if (length(ch) == 0) return(NULL)
-      db0     <- toupper(sub("^fun_", "", ch[[1]]))
+      db0     <- if (length(ch) > 0) resolve_db_name(proj, sub("^fun_", "", ch[[1]])) else ""
       metrics <- avail_fun_metrics(proj, db0)
       tags$div(class = "sidebar-box",
         tags$div(class = "form-label", "Database"),
         selectInput("tbl_functions", NULL, choices = ch),
         tags$div(class = "form-label", style = "margin-top:4px;", "Metric"),
         selectInput("tbl_fun_metric", NULL, choices = metrics,
-          selected = if ("abund" %in% metrics) "abund" else metrics[[1]]),
+          selected = if (length(metrics) == 0) NULL else if ("abund" %in% metrics) "abund" else metrics[[1]]),
         entries_selector)
 
     } else if (cat == "bins") {
@@ -142,17 +200,17 @@ server <- function(input, output, session) {
     metrics <- avail_tax_metrics(proj, rank)
     cur <- isolate(input$tbl_tax_metric)
     sel <- if (!is.null(cur) && cur %in% metrics) cur else
-           if ("percent" %in% metrics) "percent" else metrics[[1]]
+           if (length(metrics) == 0) NULL else if ("percent" %in% metrics) "percent" else metrics[[1]]
     updateSelectInput(session, "tbl_tax_metric", choices = metrics, selected = sel)
     do_load_table(input$tbl_taxonomy)
   })
   observeEvent(input$tbl_functions, ignoreNULL=TRUE, ignoreInit=TRUE, {
     proj <- sqm_data(); req(proj)
-    db <- toupper(sub("^fun_", "", input$tbl_functions))
+    db <- resolve_db_name(proj, sub("^fun_", "", input$tbl_functions))
     metrics <- avail_fun_metrics(proj, db)
     cur <- isolate(input$tbl_fun_metric)
     sel <- if (!is.null(cur) && cur %in% metrics) cur else
-           if ("abund" %in% metrics) "abund" else metrics[[1]]
+           if (length(metrics) == 0) NULL else if ("abund" %in% metrics) "abund" else metrics[[1]]
     updateSelectInput(session, "tbl_fun_metric", choices = metrics, selected = sel)
     do_load_table(input$tbl_functions)
   })
@@ -190,7 +248,7 @@ server <- function(input, output, session) {
           if (!is.null(smp) && length(smp) > 0) d[, colnames(d) %in% smp, drop=FALSE] else d
         }
         else if (startsWith(tt, "fun_")) {
-          db     <- toupper(sub("^fun_", "", tt))
+          db     <- resolve_db_name(proj, sub("^fun_", "", tt))
           metric <- isolate(input$tbl_fun_metric) %||% "abund"
           d <- as.data.frame(proj$functions[[db]][[metric]])
           if (!is.null(smp) && length(smp) > 0) d <- d[, colnames(d) %in% smp, drop=FALSE]
@@ -287,7 +345,7 @@ server <- function(input, output, session) {
     } else {
       tables_path()
     }
-    if (is.null(tp) || nchar(tp) == 0 || !dir.exists(tp)) {
+    if (is.null(tp) || length(tp) == 0 || !nzchar(tp) || !dir.exists(tp)) {
       showNotification("Directory not available. Please select it.", type = "error", duration = 8); return()
     }
     status("loading")
@@ -604,7 +662,7 @@ server <- function(input, output, session) {
         ),
         tags$div(class="sidebar-box",style="margin-top:8px;",
           help_label("Count type", .count_tip(tax_counts)),
-          selectInput("tax_count",NULL,choices=tax_counts,selected=if("percent"%in%tax_counts)"percent" else tax_counts[[1]]),
+          selectInput("tax_count",NULL,choices=tax_counts,selected=if(length(tax_counts)==0) NULL else if("percent"%in%tax_counts)"percent" else tax_counts[[1]]),
           tags$div(class="form-label",style="margin-top:4px;","No. of taxa"),
           numericInput("n_taxa",NULL,value=15,min=1,max=200,step=1)
         ),
@@ -626,7 +684,7 @@ server <- function(input, output, session) {
           selectInput("tax_hm_rank", NULL, choices=avail_ranks),
           help_label("Count type", .count_tip(tax_counts)),
           selectInput("tax_hm_count", NULL, choices=tax_counts,
-            selected=if("percent"%in%tax_counts)"percent" else tax_counts[[1]]),
+            selected=if(length(tax_counts)==0) NULL else if("percent"%in%tax_counts)"percent" else tax_counts[[1]]),
           tags$div(class="form-label",style="margin-top:4px;","No. of taxa"),
           numericInput("tax_hm_n", NULL, value=30, min=1, max=500, step=1),
           help_label("Rescale", "Options for rescaling and normalizing data: None, Logarithmic (log₁₀(x+1)), Z-score (rows)"),
@@ -699,7 +757,7 @@ server <- function(input, output, session) {
         )
       )
     } else if (startsWith(pt, "func_")) {
-      fun_label <- toupper(sub("^func_", "", pt))
+      fun_label <- resolve_db_name(sqm_data(), sub("^func_", "", pt))
       tagList(
         tags$div(class="sidebar-box",
           tagList(
@@ -712,7 +770,7 @@ server <- function(input, output, session) {
         ),
         uiOutput("func_category_ui"),
         tags$div(class="sidebar-box",style="margin-top:8px;",
-          help_label("Count type", .count_tip(if(!is.null(sqm_data())) available_func_counts(sqm_data(), toupper(sub("^func_","",input$plot_type))) else c("Copy number"="copy_number"))), uiOutput("func_count_ui"),
+          help_label("Count type", .count_tip(if(!is.null(sqm_data())) available_func_counts(sqm_data(), resolve_db_name(sqm_data(), sub("^func_","",input$plot_type))) else c("Copy number"="copy_number"))), uiOutput("func_count_ui"),
           tags$div(class="form-label",style="margin-top:4px;","No. of functions"), numericInput("n_funcs", NULL, value=20, min=1, max=500, step=1),
           help_label("Rescale", "Options for rescaling and normalizing data: None, Logarithmic (log₁₀(x+1)), Z-score (rows)"),
           selectInput("plot_scale", NULL,
@@ -725,7 +783,7 @@ server <- function(input, output, session) {
   output$func_search_status <- renderUI({
     pt <- input$plot_type; req(startsWith(pt, "func_")); req(sqm_data())
     pattern <- build_func_pattern(input$func_search %||% ""); if (is.null(pattern)) return(NULL)
-    fun_level <- toupper(sub("^func_", "", pt))
+    fun_level <- resolve_db_name(sqm_data(), sub("^func_", "", pt))
     all_ids   <- tryCatch(rownames(sqm_data()$functions[[fun_level]]$abund), error=function(e) character(0))
     all_names <- tryCatch(sqm_data()$misc[[paste0(fun_level,"_names")]], error=function(e) character(0))
     terms <- trimws(unlist(strsplit(input$func_search %||% "", "[,;]+")))
@@ -751,9 +809,9 @@ server <- function(input, output, session) {
   })
   output$func_count_ui <- renderUI({
     pt <- input$plot_type; req(startsWith(pt, "func_"))
-    fun_level <- toupper(sub("^func_", "", pt))
+    fun_level <- resolve_db_name(sqm_data(), sub("^func_", "", pt))
     counts <- if (!is.null(sqm_data())) available_func_counts(sqm_data(),fun_level) else c("Copy number"="copy_number")
-    selectInput("func_count",NULL,choices=counts,selected=if("copy_number"%in%counts)"copy_number" else counts[[1]])
+    selectInput("func_count",NULL,choices=counts,selected=if(length(counts)==0) NULL else if("copy_number"%in%counts)"copy_number" else counts[[1]])
   })
   output$sqm_plot_ui <- renderUI({
     pt <- input$plot_type
@@ -990,7 +1048,7 @@ server <- function(input, output, session) {
   func_plot_reactive <- reactive({
     req(sqm_data()); proj <- sqm_data(); pt <- input$plot_type
     req(startsWith(pt, "func_"))
-    fun_level <- toupper(sub("^func_", "", pt))
+    fun_level <- resolve_db_name(proj, sub("^func_", "", pt))
     req(nchar(input$func_count %||% "") > 0)
     req(!is.null(input$n_funcs))
     fs <- input$func_font_size %||% 11
@@ -2114,7 +2172,7 @@ server <- function(input, output, session) {
       }, all_counts)
       if (length(avail) == 0) avail <- c("Percentages" = "percent")
     }
-    sel <- if ("copy_number" %in% avail) "copy_number" else avail[[1]]
+    sel <- if (length(avail) == 0) NULL else if ("copy_number" %in% avail) "copy_number" else avail[[1]]
     selectInput("pw_count", NULL, choices = avail, selected = sel)
   })
 
@@ -2926,7 +2984,7 @@ server <- function(input, output, session) {
         rank <- sub("^tax_", "", rdb_val)
         avail_tax_metrics(proj, rank)
       } else {
-        db <- toupper(sub("^fun_", "", rdb_val))
+        db <- resolve_db_name(proj, sub("^fun_", "", rdb_val))
         avail_fun_metrics(proj, db)
       }
     } else {
@@ -2984,7 +3042,7 @@ server <- function(input, output, session) {
           selectInput("mv_metric", NULL, choices = metrics,
             selected = if (!is.null(input$mv_metric) && input$mv_metric %in% metrics)
               input$mv_metric
-            else if ("abund" %in% metrics) "abund" else metrics[[1]])),
+            else if (length(metrics) == 0) NULL else if (length(metrics) == 0) NULL else if ("abund" %in% metrics) "abund" else metrics[[1]])),
         if (is_pca) tagList(
           help_label("Normalization",
             paste0(
@@ -3092,7 +3150,7 @@ server <- function(input, output, session) {
         rank <- sub("^tax_", "", rdb)
         as.matrix(proj$taxa[[rank]][[metric]])
       } else {
-        db <- toupper(sub("^fun_", "", rdb))
+        db <- resolve_db_name(proj, sub("^fun_", "", rdb))
         fun_names_vec <- tryCatch(proj$misc[[paste0(db, "_names")]], error = function(e) NULL)
         as.matrix(proj$functions[[db]][[metric]])
       }

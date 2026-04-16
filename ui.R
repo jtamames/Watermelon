@@ -27,11 +27,11 @@ ui <- page_navbar(
     layout_sidebar(
       sidebar = sidebar(width = 250,
         tags$div(class = "sidebar-box",
-          help_label("Plot type",
-            c("Taxonomic profiles" = "Distribution of taxa across samples at different taxonomic ranks",
-              "Functional profiles" = "Distribution of functional categories (COG, KEGG, PFAM, etc.) across samples",
-              "MAGs" = "Abundance of Metagenome-Assembled Genomes across samples"),
-            style=""),
+          tags$div(class = "form-label", "Category"),
+          uiOutput("plot_category_ui")
+        ),
+        tags$div(class = "sidebar-box",
+          tags$div(class = "form-label", "Plot type"),
           uiOutput("plot_type_ui")
         ),
         uiOutput("plot_controls_ui"),
