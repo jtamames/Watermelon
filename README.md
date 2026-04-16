@@ -10,88 +10,47 @@ Interactive Shiny dashboard for visualizing and exploring [SqueezeMeta](https://
 - **Krona** — generates and displays interactive Krona taxonomy charts inline, with per-sample filtering and HTML download
 - **Pathways** — overlays functional abundance data onto KEGG pathway maps using `exportPathway` from SQMtools; supports per-sample coloring, log scale, fold-change between sample groups, and hierarchical pathway browser with search
 - **Multivariate** — ordination analysis (PCA and NMDS) on taxonomy or functional abundance data, with multiple normalization and distance options, quality warnings, and interactive biplot
+- **Comparison** — statistical comparison between two sample groups (Wilcoxon, DESeq2, edgeR) with volcano plot and results table
 
 ---
 
-## Requirements
+## Installation
 
-### System dependencies
+### 1. Clone the repository
 
-If you are installing inside a **conda environment** you may get errors about `knitr`, `rmarkdown`, `xfun`, `highr`, `htmlwidgets` or `DT` failing to compile from source. The most reliable fix is to use the Posit Package Manager (RSPM), which provides precompiled R binaries for Linux and avoids all compilation issues:
-
-**Ubuntu 20.04 (focal):**
-```r
-options(repos = c(RSPM = "https://packagemanager.posit.co/cran/__linux__/focal/latest"))
-install.packages(c("xfun", "highr", "knitr", "rmarkdown", "htmlwidgets", "DT"))
+```bash
+git clone https://github.com/jtamames/watermelon.git
+cd watermelon
 ```
 
-**Ubuntu 22.04 (jammy):**
-```r
-options(repos = c(RSPM = "https://packagemanager.posit.co/cran/__linux__/jammy/latest"))
-install.packages(c("xfun", "highr", "knitr", "rmarkdown", "htmlwidgets", "DT"))
+### 2. Install R dependencies
+
+Make sure your SqueezeMeta conda environment is active, then run the installer:
+
+```bash
+conda activate SqueezeMeta
+bash install.sh
 ```
 
-To check your Ubuntu version: `lsb_release -cs`
+The installer handles all R packages (CRAN and Bioconductor) and any required system libraries automatically.
 
-This downloads precompiled binaries instead of compiling from source, bypassing all system library dependency issues. After running the above, proceed with the regular `install.packages` commands below.
+### 3. Run the app
 
-### R (≥ 4.1)
-
-Install the required R packages:
-
-```r
-install.packages(c(
-  "shiny",
-  "shinyjs",
-  "shinyFiles",
-  "bslib",
-  "DT"
-))
+```bash
+Rscript -e 'shiny::runApp("app.R", launch.browser=FALSE)'
 ```
 
-Install **SQMtools** from CRAN:
+To make the app accessible from another machine on the network:
 
-```r
-install.packages("SQMtools")
+```bash
+Rscript -e 'shiny::runApp("app.R", host="0.0.0.0", port=3838, launch.browser=FALSE)'
 ```
 
-Or install the latest development version from the SqueezeMeta repository:
+Then open `http://<server-ip>:3838` in your local browser.
 
-```r
-install.packages(
-  "/path/to/SqueezeMeta/lib/SQMtools",
-  repos = NULL,
-  type  = "source"
-)
-```
+---
 
-### plotly (required for Plots tab)
-
-```r
-install.packages("plotly")
-```
-
-### vegan (optional, required for Multivariate tab)
-
-```r
-install.packages("vegan")
-```
-
-### pathview (optional, required for Pathways tab)
-
-`pathview` is a Bioconductor package that downloads and annotates KEGG pathway maps. It also installs `KEGGREST` as a dependency.
-
-```r
-if (!require("BiocManager", quietly = TRUE))
-  install.packages("BiocManager")
-BiocManager::install("pathview")
-```
-
-The Pathways tab requires an **internet connection** at generation time — `pathview` downloads the pathway map image from the KEGG servers on each run.
-
-`ggpattern` and `magick` are **not required**. Watermelon generates its own inline color scale legend. Do not attempt to install `ggpattern` — it depends on `sf` → `s2` / `units`, which require system GIS libraries (GDAL, PROJ) that are rarely available in conda environments.
-
-### KronaTools (optional, required for Krona tab)
+## KronaTools (optional, required for Krona tab)
 
 If SqueezeMeta is already installed in your environment, KronaTools is likely already available — check before installing:
 
@@ -101,7 +60,14 @@ which ktImportText
 
 If it prints a path, no further action is needed. Watermelon detects it automatically.
 
-If it is not available, install it manually (recommended over conda if you are having network issues):
+If it is not available, install it via conda:
+
+```bash
+conda install -c bioconda krona
+ktUpdateTaxonomy.sh
+```
+
+Or manually:
 
 ```bash
 wget https://github.com/marbl/Krona/releases/download/v2.8.1/KronaTools-2.8.1.tar.gz
@@ -111,53 +77,9 @@ cd KronaTools-2.8.1
 ktUpdateTaxonomy.sh
 ```
 
-Or via conda if your network allows it:
-
-```bash
-conda install -c bioconda krona
-ktUpdateTaxonomy.sh
-```
-
----
-
-## Installation
-
-Clone this repository:
-
-```bash
-git clone https://github.com/jtamames/Watermelon.git
-cd Watermelon
-```
-
 ---
 
 ## Usage
-
-Launch the app from R:
-
-```r
-shiny::runApp("app.R")
-```
-
-Or from the command line:
-
-```bash
-Rscript -e 'shiny::runApp("app.R")'
-```
-
-**If you get a `'browser' must be a non-empty character string` error** (common on servers or SSH sessions without a desktop environment), disable the automatic browser launch:
-
-```r
-shiny::runApp("app.R", launch.browser = FALSE)
-```
-
-To make the app accessible from another machine on the network:
-
-```r
-shiny::runApp("app.R", host = "0.0.0.0", port = 3838, launch.browser = FALSE)
-```
-
-Then open `http://<server-ip>:3838` in your local browser.
 
 ### Loading a project
 
@@ -177,18 +99,18 @@ If the tables directory cannot be detected automatically, a manual directory sel
 | Type | Load function | Features |
 |------|--------------|----------|
 | SQM (full) | `loadSQM` | All tabs, all plots, taxonomy/function search, bins |
-| SQMlite | `loadSQMlite` | Plots, Tables, Krona, Pathways, Multivariate; no contig/ORF/bin detail; no subset functions |
+| SQMlite | `loadSQMlite` | Plots, Tables, Krona, Pathways, Multivariate, Comparison; no contig/ORF/bin detail |
 
 ---
 
 ## Tabs
 
 ### Project
-Displays a structured summary of the loaded project: sample list, read counts, contig and ORF statistics, taxonomic classification coverage, most abundant taxa per rank.
+Displays a structured summary of the loaded project: sample list, mapping statistics, read counts, contig and ORF statistics, taxonomic classification coverage, most abundant taxa per rank.
 
 ### Plots
 
-Select a plot type from the sidebar. Available types depend on the data present in the loaded project.
+Select a category (Taxonomy / Functions / MAGs) and then a plot type from the sidebar.
 
 **Taxonomy (barplot)** — stacked barplot of the most abundant taxa at the selected rank.
 
@@ -201,22 +123,19 @@ Select a plot type from the sidebar. Available types depend on the data present 
 
 - Same rank, count type and number of taxa selectors as the barplot
 - Filter options: Ignore unmapped, Ignore unclassified, Ignore ambiguous
-- Rescale selector in the sidebar: None, Log₁₀(x+1), Z-score — row order is always computed on raw values and stays stable when rescaling
+- Rescale selector in the sidebar: None, Log₁₀(x+1), Z-score
 - Format controls (top bar): width, height, font size, colour palette
-- Hover to see exact values; row height is fixed at 28 px/taxon for consistent cell size
 
 **COG / KEGG / PFAM / external databases** — interactive heatmap of the most abundant functions.
 
 - Search by function ID or keyword; comma-separated, empty means top N
 - Optional category filter (COG category or KEGG hierarchy) where available
-- Count type, number of functions and rescale (None, Log₁₀(x+1), Z-score) selectors in the sidebar
-- Row order is computed on raw values and stays stable when rescaling
+- Count type, number of functions and rescale (None, Log₁₀(x+1), Z-score) selectors
 - Format controls (top bar): width, height, font size, colour palette, label width
-- Hover to see function name, sample and exact value; full function names shown in row labels (truncated at 80 characters)
 
-**Binning** — barplot of bin abundances (SQM full only).
+**MAGs** — barplot of bin abundances (SQM full only).
 
-All plots support a **sample selector** to restrict the analysis to a subset of samples. Use the **Download PNG** button to export (for plotly-based plots, use the camera button in the plot toolbar instead).
+All plots support a **sample selector** to restrict the analysis to a subset of samples.
 
 ### Tables
 Four independent category selectors:
@@ -234,46 +153,30 @@ Generates an interactive Krona taxonomy chart using `exportKrona` from SQMtools 
 ### Pathways
 Overlays KEGG functional abundance data onto pathway maps using `exportPathway` from SQMtools (a wrapper for the `pathview` Bioconductor package). Requires an internet connection.
 
-- **Pathway browser** — hierarchical tree organised by the 6 top-level KEGG categories (Metabolism, Genetic Information Processing, Environmental Information Processing, Cellular Processes, Organismal Systems, Human Diseases), with subcategories and search filter
-- **Count type** — copy number, TPM, raw abundances, percentages, or base counts
-- **Mode** — all samples together (multi-colour map), one PNG per sample, or log2 fold-change between two groups of samples
-- **Legend** — inline color scale bar per sample, built from the same parameters used to generate the map
-- **Download** — exports all generated PNGs as a zip file
+- Browse pathways by KEGG hierarchy or search by name/ID
+- Click on linked pathway boxes in the map to navigate to connected pathways
+- Supports per-sample coloring, fold-change mode between two sample groups, and log scale
 
 ### Multivariate
-Ordination analysis on taxonomy or functional abundance data. Requires the `vegan` R package.
+Ordination analysis on taxonomy or functional abundance data.
 
-**Analysis types:**
-
-- **PCA** — Principal Component Analysis via `vegan::rda()`. Displays a biplot with sample scores and feature loadings (arrows). The percentage of variance explained by each axis is shown on the axis labels. Optionally show feature labels on arrow tips.
-- **NMDS** — Non-metric Multidimensional Scaling via `vegan::metaMDS()`. Displays sample scores with the stress value annotated on the plot.
-
-**Data options:**
-- **Data type** — taxonomy (any rank) or functions (any database: COG, KEGG, PFAM, external)
-- **Metric** — any available count type (raw abundances, percentages, TPM, copy number, etc.)
-- **Number of features** — uses the N most abundant features (by mean across samples)
-- **Exclude Unclassified** — removes rows labelled Unclassified, Unmapped or No database
-- **Exclude ambiguous taxa** — removes any row whose name starts with "unclassified" (e.g. "unclassified Pseudomonadota")
-
-**Normalization (PCA only):**
-- **CLR** — centered log-ratio with pseudocount +1; the recommended option for compositional metagenomics data
-- **Log10** — log10(x + 1); useful when preserving relative scale
-- **Raw** — no transformation; suitable for data already normalized (TPM, percentages). Note: may cause PC1 to reflect sequencing depth rather than community composition
-
-**Distance (NMDS only):**
-- **Bray-Curtis** — standard ecological distance on proportions; recommended for most metagenomics datasets
-- **Jaccard** — presence/absence version of Bray-Curtis
-- **Hellinger** — square root of relative abundances followed by Euclidean distance; reduces the influence of dominant features
-- **Euclidean** — Euclidean distance on raw counts
+- **PCA** — with CLR, log, z-score or raw normalization
+- **NMDS** — with Bray-Curtis, Jaccard, Hellinger or Euclidean distance
 
 **Quality warnings** are displayed below the plot when:
 - Only 2 samples (PCA is trivial)
 - PC1 explains >90% of variance (nearly one-dimensional data)
 - PC1+PC2 explain <50% of variance (limited representation)
-- PC1+PC2 explain <30% of variance (poor representation)
 - Raw normalization selected (risk of sequencing depth artefact)
-- NMDS stress <0.01 (too few samples for meaningful ordination)
 - NMDS stress >0.2 (ordination may not be reliable)
+
+### Comparison
+Statistical comparison of functional or taxonomic profiles between two user-defined sample groups.
+
+- Define Group A and Group B by selecting samples from checkboxes
+- Choose method: Wilcoxon rank-sum, DESeq2, or edgeR
+- Results shown as an interactive volcano plot and a sortable table with per-sample abundance columns
+- Download results as CSV
 
 ---
 
@@ -288,10 +191,11 @@ Ordination analysis on taxonomy or functional abundance data. Requires the `vega
 | DT | CRAN | Core |
 | SQMtools | CRAN / SqueezeMeta repo | Core |
 | plotly | CRAN | Plots tab |
-| pandoc | conda-forge / system | Needed by DT in conda envs |
 | vegan | CRAN | Multivariate tab |
+| xml2 | CRAN | Pathways tab |
 | pathview | Bioconductor | Pathways tab |
-| KEGGREST | Bioconductor (auto with pathview) | Pathways tab |
+| DESeq2 | Bioconductor | Comparison tab (optional) |
+| edgeR | Bioconductor | Comparison tab (optional) |
 | KronaTools (`ktImportText`) | conda / GitHub | Krona tab |
 
 ---
@@ -305,20 +209,13 @@ This section explains how to make Watermelon accessible to remote users via **Sh
 All packages must be installed as root so Shiny Server can find them:
 
 ```bash
-# Install cmake first — required to compile the 'fs' R package
-sudo apt-get install -y cmake
-
-sudo R -e "install.packages(c('shiny','shinyjs','shinyFiles','bslib','DT','plotly','SQMtools','vegan'), repos='https://cran.rstudio.com/')"
-
-# Optional: pathview and Biostrings (required by SQMtools)
-# Note: use single quotes for the outer string to avoid bash interpreting '!'
+sudo apt-get install -y cmake liblzma-dev
+sudo R -e "install.packages(c('shiny','shinyjs','shinyFiles','bslib','DT','plotly','SQMtools','vegan','xml2'), repos='https://cran.rstudio.com/')"
 sudo R -e 'install.packages("BiocManager", repos="https://cran.rstudio.com/")'
-sudo R -e 'BiocManager::install(c("pathview", "Biostrings"))'
+sudo R -e 'BiocManager::install(c("pathview", "Biostrings", "DESeq2", "edgeR"))'
 ```
 
-If you are on Ubuntu inside a conda environment and get compilation errors, use RSPM precompiled binaries first (see [System dependencies](#system-dependencies) above).
-
-> **Note:** these commands must be run **outside** any conda environment, so that the system R (typically `/usr/bin/R`) is used. Shiny Server uses the system R, not the one inside the conda environment. Run `conda deactivate` before proceeding, and verify with `which R`.
+> **Note:** run these commands **outside** any conda environment so the system R is used. Run `conda deactivate` first and verify with `which R`.
 
 ### 2. Install Shiny Server
 
@@ -332,7 +229,7 @@ sudo dpkg -i shiny-server-1.5.21.1012-amd64.deb
 
 ```bash
 sudo mkdir -p /srv/shiny-server/watermelon
-sudo cp /path/to/app.R /srv/shiny-server/watermelon/
+sudo cp -r /path/to/watermelon/* /srv/shiny-server/watermelon/
 ```
 
 ### 4. Configure Shiny Server
@@ -354,8 +251,6 @@ server {
 
 ### 5. Grant data access to the shiny user
 
-The `shiny` system user needs read access to the SqueezeMeta project directories:
-
 ```bash
 # Option A: add shiny to the group that owns the data
 sudo usermod -aG your_data_group shiny
@@ -364,20 +259,20 @@ sudo usermod -aG your_data_group shiny
 sudo chmod -R o+rX /path/to/your/sqm/projects
 ```
 
-Also make sure the `shiny` user can traverse your home directory if the projects are inside it:
+Also make sure the `shiny` user can traverse your home directory:
 
 ```bash
 chmod o+x /home/your_username
 ```
 
-> **Note on directory navigation in the app:** the file browser shows two roots: `home` (which maps to `/home/shiny`, the Shiny Server user's home — typically empty) and `root` (which maps to `/`). To reach your project data, choose **root** and then navigate to the full path: `root → home → your_username → your_project`.
+> **Note on directory navigation:** the file browser shows two roots: `home` (maps to `/home/shiny`, typically empty) and `root` (maps to `/`). To reach your project data, choose **root** and navigate to the full path.
 
 ### 6. Start and enable the service
 
 ```bash
 sudo systemctl start shiny-server
-sudo systemctl enable shiny-server   # start automatically on reboot
-sudo systemctl status shiny-server   # verify it is running
+sudo systemctl enable shiny-server
+sudo systemctl status shiny-server
 ```
 
 ### 7. Open the firewall port
@@ -387,8 +282,6 @@ sudo ufw allow 3838/tcp
 ```
 
 ### 8. Access the app
-
-Users on the same network can now open:
 
 ```
 http://<server-ip>:3838/watermelon
@@ -400,7 +293,7 @@ To find the server IP: `hostname -I`
 
 ## Remote access from outside the local network
 
-### Option A: SSH tunnel (no server config needed, encrypted)
+### Option A: SSH tunnel
 
 The remote user runs this on their own machine:
 
@@ -408,9 +301,9 @@ The remote user runs this on their own machine:
 ssh -L 3838:localhost:3838 user@server-ip
 ```
 
-Then opens `http://localhost:3838/watermelon` in their browser. No firewall changes needed beyond standard SSH access.
+Then opens `http://localhost:3838/watermelon` in their browser.
 
-### Option B: nginx reverse proxy with HTTPS (permanent, production)
+### Option B: nginx reverse proxy with HTTPS
 
 ```bash
 sudo apt-get install -y nginx certbot python3-certbot-nginx
@@ -440,16 +333,11 @@ sudo systemctl restart nginx
 sudo certbot --nginx -d watermelon.yourdomain.org
 ```
 
-Users then access `https://watermelon.yourdomain.org/watermelon`.
-
-### Option C: ngrok (quick demo, no domain needed)
+### Option C: ngrok (quick demo)
 
 ```bash
-# Install from https://ngrok.com, then:
 ngrok http 3838
 ```
-
-ngrok prints a temporary public URL (e.g. `https://abc123.ngrok.io`). The tunnel stays alive as long as the process runs.
 
 ---
 
@@ -467,9 +355,7 @@ tail -f /var/log/shiny-server/*.log
 sudo chmod -R o+rX /path/to/sqm/project
 ```
 
-**`app_cache` permission errors in the log**
-
-If the log shows repeated warnings about `/srv/shiny-server/watermelon/app_cache`, fix ownership:
+**`app_cache` permission errors**
 ```bash
 sudo chown -R shiny:shiny /srv/shiny-server/watermelon/
 sudo systemctl restart shiny-server
