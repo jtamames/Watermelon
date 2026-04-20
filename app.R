@@ -1,4 +1,7 @@
 source("global.R")
+source("launcher_profiles.R")
+source("launcher_build.R")
+source("launcher_run.R")
 source("ui.R")
 source("server.R")
 shinyApp(ui = ui, server = server, options = list(launch.browser = FALSE))

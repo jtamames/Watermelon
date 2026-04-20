@@ -1,13 +1,159 @@
 ui <- page_navbar(
+  id = "main_navbar",
   title = tags$img(
     src = paste0("data:image/png;base64,", WATERMELON_LOGO_B64),
     height = "52px",
     style = "margin: 2px 0;"
   ),
+  window_title = "Watermelon",
   theme = sqm_theme,
   navbar_options = navbar_options(theme = "light", bg = "#ffffff"),
   header = tagList(useShinyjs(), tags$head(tags$style(HTML(custom_css)))),
-  nav_panel("Project",
+  # ── Run ─────────────────────────────────────────────────────────────────
+  nav_panel(
+    "Run",
+    layout_sidebar(
+      sidebar = sidebar(
+        width = 310,
+
+        # ---- Project Setup ----
+        tags$div(class = "sidebar-box",
+          tags$div(class = "form-label", "Project Setup"),
+          textInput("lnch_project_name", "Project name", placeholder = "my_project"),
+          selectInput("lnch_program", "Program",
+            choices = c("SqueezeMeta" = "SqueezeMeta.pl",
+                        "sqm_reads"   = "sqm_reads.pl",
+                        "sqm_longreads" = "sqm_longreads.pl")),
+          conditionalPanel(
+            condition = "input.lnch_program == 'SqueezeMeta.pl'",
+            selectInput("lnch_mode", "Execution mode",
+              choices = c("coassembly","sequential","merged","seqmerge"))
+          )
+        ),
+
+        # ---- Input Files ----
+        tags$div(class = "sidebar-box",
+          tags$div(class = "form-label", "Input Files"),
+          shinyFilesButton("lnch_samples_file", "Samples file (-s)", "Choose file", multiple = FALSE),
+          tags$div(class = "launcher-file-path", textOutput("lnch_samples_path")),
+          shinyDirButton("lnch_input_dir", "Input directory (-f)", "Choose directory", multiple = FALSE),
+          tags$div(class = "launcher-file-path", textOutput("lnch_input_path")),
+          shinyDirButton("lnch_workdir", "Working directory", "Choose directory", multiple = FALSE),
+          tags$div(class = "launcher-file-path", textOutput("lnch_workdir_path"))
+        ),
+
+        # ---- Profile (SqueezeMeta only) ----
+        conditionalPanel(
+          condition = "input.lnch_program == 'SqueezeMeta.pl'",
+          tags$div(class = "sidebar-box",
+            tags$div(class = "form-label", "Profile"),
+            selectInput("lnch_profile", NULL,
+              choices  = sapply(get_builtin_profiles(), function(x) x$name),
+              selected = "Standard Metagenome")
+          )
+        ),
+
+        # ---- Advanced ----
+        tags$div(class = "sidebar-box",
+          tags$div(class = "form-label", "Advanced"),
+          accordion(open = FALSE, multiple = TRUE,
+
+            accordion_panel("Filtering",
+              checkboxInput("lnch_trimmomatic", "Run Trimmomatic", FALSE),
+              conditionalPanel(condition = "input.lnch_trimmomatic == true",
+                textInput("lnch_cleaning_params", "Parameters",
+                  value = "LEADING:8 TRAILING:8 SLIDINGWINDOW:10:15 MINLEN:30"))
+            ),
+
+            conditionalPanel(condition = "input.lnch_program == 'SqueezeMeta.pl'",
+              accordion_panel("Assembly",
+                selectInput("lnch_assembler", "Assembler",
+                  choices = c("megahit","spades","rnaspades","canu","flye")),
+                textInput("lnch_assembly_opts", "Options", placeholder = ""),
+                numericInput("lnch_min_contig", "Min contig length", 200, min = 0),
+                checkboxInput("lnch_singletons", "Use singletons", FALSE)
+              )
+            ),
+
+            accordion_panel("Annotation",
+              checkboxInput("lnch_no_cog",  "No COG",  FALSE),
+              checkboxInput("lnch_no_kegg", "No KEGG", FALSE),
+              checkboxInput("lnch_no_pfam", "No PFAM", TRUE),
+              checkboxInput("lnch_euk",     "Eukaryotes", FALSE),
+              checkboxInput("lnch_dbl",     "Doublepass", FALSE),
+              shinyFilesButton("lnch_extdb", "External DBs", "Select file", multiple = FALSE),
+              tags$div(class = "launcher-file-path", textOutput("lnch_extdb_path"))
+            ),
+
+            conditionalPanel(condition = "input.lnch_program == 'SqueezeMeta.pl'",
+              accordion_panel("Mapping",
+                selectInput("lnch_mapper", "Mapper",
+                  choices = c("bowtie","bwa","minimap2-ont","minimap2-pb","minimap2-sr")),
+                textInput("lnch_mapping_opts", "Options", placeholder = "")
+              )
+            ),
+
+            conditionalPanel(condition = "input.lnch_program == 'SqueezeMeta.pl'",
+              accordion_panel("Binning",
+                checkboxInput("lnch_no_bins", "No bins", FALSE),
+                conditionalPanel(condition = "input.lnch_no_bins == false",
+                  checkboxInput("lnch_only_bins", "Only bins", FALSE),
+                  checkboxGroupInput("lnch_binners", "Binners",
+                    choices  = c("Concoct"="concoct","Metabat2"="metabat2","MaxBin"="maxbin"),
+                    selected = c("concoct","metabat2"))
+                )
+              )
+            ),
+
+            accordion_panel("Performance",
+              numericInput("lnch_threads", "Threads", 8, min = 1)
+            )
+          )
+        ),
+
+        # ---- Command preview ----
+        tags$div(style = "margin-top:6px;",
+          tags$div(class = "form-label", "Command preview"),
+          verbatimTextOutput("lnch_cmd_preview", placeholder = TRUE)
+        ),
+
+        # ---- Run / Abort ----
+        tags$div(id = "launcher-run-bar",
+          actionButton("lnch_run",  "\u25b6 Run",   class = "btn-primary btn-sm"),
+          actionButton("lnch_stop", "\u25a0 Abort",  class = "btn-danger  btn-sm")
+        )
+      ),
+
+      # ── Log panel ──────────────────────────────────────────────────────
+      card(
+        card_header(
+          tags$div(style = "display:flex; justify-content:space-between; align-items:center;",
+            "Execution log", uiOutput("lnch_status_badge"))
+        ),
+        card_body(
+          tags$div(id = "launcher-log-container", uiOutput("lnch_log")),
+          tags$script(HTML("
+            // Auto-scroll log
+            Shiny.addCustomMessageHandler('lnch_scroll_log', function(msg) {
+              var el = document.getElementById('launcher-log-container');
+              if (el) el.scrollTop = el.scrollHeight;
+            });
+
+            // Close the shinyFiles directory picker window after Select is clicked.
+            // The button id is sF-selectButton, backdrop class is sF-modalBackdrop.
+            $(document).on('click', '#sF-selectButton', function() {
+              setTimeout(function() {
+                $('.sF-modalContainer').hide().remove();
+                $('.sF-modalBackdrop').remove();
+              }, 100);
+            });
+          "))
+        )
+      )
+    )
+  ),
+
+nav_panel("Load",
     layout_sidebar(fillable = FALSE,
       sidebar = sidebar(width = 300, open = TRUE,
         tags$div(class = "sidebar-box",
@@ -224,5 +370,5 @@ ui <- page_navbar(
         )
       )
     )
-  )
+  ),
 )

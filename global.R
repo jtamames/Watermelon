@@ -402,6 +402,45 @@ table.dataTable tbody tr:hover { background: #eef5fc !important; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--blue); }
+
+/* ── Launcher tab ──────────────────────────────────────────────── */
+#launcher-log-container {
+  background: #1e1e2e;
+  color: #cdd6f4;
+  padding: 12px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  height: 520px;
+  overflow-y: auto;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+#launcher-cmd-preview {
+  background: #1e1e2e;
+  color: #a6e3a1;
+  padding: 10px 12px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  border-radius: 6px;
+  border: 1px solid #313244;
+  white-space: pre-wrap;
+  word-break: break-all;
+  min-height: 36px;
+  margin-top: 4px;
+}
+.launcher-file-path {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  word-break: break-all;
+  margin: 2px 0 6px 0;
+}
+.launcher-status-idle     { background-color: var(--muted)   !important; }
+.launcher-status-running  { background-color: var(--blue)    !important; }
+.launcher-status-finished { background-color: var(--teal)    !important; }
+.launcher-status-error    { background-color: #c0392b        !important; }
+.launcher-status-aborted  { background-color: #d68910        !important; }
+#launcher-run-bar { display:flex; gap:6px; margin-top:8px; }
 "
 build_func_pattern <- function(search_text) {
   search_text <- trimws(search_text)

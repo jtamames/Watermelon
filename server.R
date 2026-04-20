@@ -7,6 +7,11 @@ server <- function(input, output, session) {
   creator_name <- reactiveVal(NULL)
   is_sqm_full  <- reactiveVal(FALSE)
 
+  # Hide analysis tabs until a project is loaded
+  ANALYSIS_TABS <- c("Plots", "Tables", "Krona", "Pathways", "Multivariate")
+  for (tab in ANALYSIS_TABS) nav_hide("main_navbar", tab)
+
+
   # ── Dynamic plot type selector ──
   output$plot_category_ui <- renderUI({
     proj <- sqm_data()
@@ -74,21 +79,24 @@ server <- function(input, output, session) {
     updateSelectInput(session, "plot_type", selected = new_pt)
   })
 
-  # Show/hide format bars based on plot type
-  observeEvent(input$plot_type, {
-    pt    <- input$plot_type %||% ""
-    is_fn <- startsWith(pt, "func_")
-    is_tax_hm <- pt == "taxonomy_heatmap"
-    if (pt == "taxonomy_bar") {
-      shinyjs::show("fmt_tax"); shinyjs::hide("fmt_func"); shinyjs::hide("fmt_tax_hm")
-    } else if (is_fn || pt == "cog_class" || pt == "kegg_class") {
-      shinyjs::hide("fmt_tax"); shinyjs::show("fmt_func"); shinyjs::hide("fmt_tax_hm")
-    } else if (is_tax_hm) {
-      shinyjs::hide("fmt_tax"); shinyjs::hide("fmt_func"); shinyjs::show("fmt_tax_hm")
-    } else {
-      shinyjs::hide("fmt_tax"); shinyjs::hide("fmt_func"); shinyjs::hide("fmt_tax_hm")
-    }
-  }, ignoreNULL = FALSE)
+  # Show/hide format bars based on plot type.
+  # Deferred via onFlushed so shinyjs is ready before first reactive fire.
+  session$onFlushed(function() {
+    observeEvent(input$plot_type, {
+      pt        <- input$plot_type %||% ""
+      is_fn     <- startsWith(pt, "func_")
+      is_tax_hm <- pt == "taxonomy_heatmap"
+      if (pt == "taxonomy_bar") {
+        shinyjs::show("fmt_tax"); shinyjs::hide("fmt_func"); shinyjs::hide("fmt_tax_hm")
+      } else if (is_fn || pt == "cog_class" || pt == "kegg_class") {
+        shinyjs::hide("fmt_tax"); shinyjs::show("fmt_func"); shinyjs::hide("fmt_tax_hm")
+      } else if (is_tax_hm) {
+        shinyjs::hide("fmt_tax"); shinyjs::hide("fmt_func"); shinyjs::show("fmt_tax_hm")
+      } else {
+        shinyjs::hide("fmt_tax"); shinyjs::hide("fmt_func"); shinyjs::hide("fmt_tax_hm")
+      }
+    }, ignoreNULL = FALSE)
+  }, once = TRUE)
 
 
   # \u2500\u2500 Dynamic table type selector \u2014 only shows available options \u2500\u2500
@@ -355,6 +363,7 @@ server <- function(input, output, session) {
                   grepl("SqueezeMeta", creator_name() %||% "", ignore.case = TRUE)
         proj <- if (is_sqm) loadSQM(tp) else loadSQMlite(tp)
         sqm_data(proj); is_sqm_full(is_sqm); status("ready")
+        for (tab in ANALYSIS_TABS) nav_show("main_navbar", tab)
       }, error = function(e) { status("error"); showNotification(paste("Error:", e$message), type = "error", duration = 8) })
     })
   })
@@ -3583,4 +3592,237 @@ server <- function(input, output, session) {
       ggplot2::ggsave(file, plot = p, width = w, height = h, dpi = 150)
     }
   )
+
+
+  # ===========================================================================
+  # LAUNCHER — Run tab
+  # All input IDs prefixed "lnch_" to avoid conflicts with Watermelon inputs.
+  # ===========================================================================
+
+  lnch_roots <- c(home = normalizePath("~"))
+
+  shinyFiles::shinyFileChoose(input, "lnch_samples_file", roots = lnch_roots)
+  shinyFiles::shinyDirChoose(input,  "lnch_input_dir",    roots = lnch_roots)
+  shinyFiles::shinyDirChoose(input,  "lnch_workdir",      roots = lnch_roots)
+  shinyFiles::shinyFileChoose(input, "lnch_extdb",        roots = lnch_roots)
+
+  lnch_samples_path <- reactive({
+    req(input$lnch_samples_file)
+    shinyFiles::parseFilePaths(lnch_roots, input$lnch_samples_file)$datapath
+  })
+  lnch_input_path <- reactive({
+    req(input$lnch_input_dir)
+    shinyFiles::parseDirPath(lnch_roots, input$lnch_input_dir)
+  })
+  lnch_workdir_path <- reactive({
+    req(input$lnch_workdir)
+    shinyFiles::parseDirPath(lnch_roots, input$lnch_workdir)
+  })
+  lnch_extdb_path <- reactive({
+    req(input$lnch_extdb)
+    shinyFiles::parseFilePaths(lnch_roots, input$lnch_extdb)$datapath
+  })
+
+  output$lnch_samples_path <- renderText({ lnch_samples_path() })
+  output$lnch_input_path   <- renderText({ lnch_input_path() })
+  output$lnch_workdir_path <- renderText({ lnch_workdir_path() })
+  output$lnch_extdb_path   <- renderText({ lnch_extdb_path() })
+
+  lnch_proc              <- reactiveVal(NULL)
+  lnch_log_buffer        <- reactiveVal("")
+  lnch_status            <- reactiveVal("Idle")
+  lnch_current_consensus <- reactiveVal(50)
+
+  session$onFlushed(function() {
+    observe({
+      shinyjs::toggleState("lnch_run",  condition = lnch_status() != "Running")
+      shinyjs::toggleState("lnch_stop", condition = lnch_status() == "Running")
+    })
+  }, once = TRUE)
+
+  output$lnch_status_badge <- renderUI({
+    s   <- lnch_status()
+    cls <- switch(s,
+      "Idle"     = "launcher-status-idle",
+      "Running"  = "launcher-status-running",
+      "Finished" = "launcher-status-finished",
+      "Error"    = "launcher-status-error",
+      "Aborted"  = "launcher-status-aborted",
+      "launcher-status-idle"
+    )
+    spinner <- if (s == "Running")
+      tags$span(class = "spinner-border spinner-border-sm me-1",
+                role = "status", `aria-hidden` = "true")
+    tags$span(class = paste("badge rounded-pill", cls), spinner, s)
+  })
+
+  observeEvent(input$lnch_program, {
+    if (input$lnch_program != "SqueezeMeta.pl")
+      updateSelectInput(session, "lnch_profile", selected = "custom")
+  })
+
+  observeEvent(input$lnch_profile, {
+    req(input$lnch_profile)
+    if (input$lnch_program != "SqueezeMeta.pl") return()
+    profile <- get_profile_by_name(input$lnch_profile)
+    if (is.null(profile)) return()
+    p <- profile$parameters
+    updateNumericInput(session,  "lnch_threads",       value    = p$threads)
+    updateSelectInput(session,   "lnch_mode",          selected = p$mode)
+    updateSelectInput(session,   "lnch_assembler",     selected = p$assembler)
+    updateSelectInput(session,   "lnch_mapper",        selected = p$mapper)
+    updateTextInput(session,     "lnch_assembly_opts", value    = p$assembly_options)
+    updateCheckboxInput(session, "lnch_no_bins",       value    = p$skip_binning)
+    lnch_current_consensus(if (!is.null(p$consensus)) p$consensus else 50)
+    showNotification(paste("Profile applied:", profile$name), type = "message")
+  })
+
+
+
+  lnch_preview_cmd <- reactive({
+    s_path <- tryCatch(lnch_samples_path(), error = function(e) NULL)
+    i_path <- tryCatch(lnch_input_path(),   error = function(e) NULL)
+    w_path <- tryCatch(lnch_workdir_path(), error = function(e) NULL)
+    pname  <- input$lnch_project_name
+    if (is.null(s_path) || is.null(i_path) || is.null(w_path) || !nzchar(pname))
+      return("# Fill in project name and paths to see the command")
+    extdb_val <- tryCatch(lnch_extdb_path(), error = function(e) NULL)
+    cmd <- build_sm_command(
+      program             = input$lnch_program,
+      samples_file        = s_path,
+      input_dir           = i_path,
+      project_name        = pname,
+      workdir             = w_path,
+      mode                = input$lnch_mode,
+      threads             = input$lnch_threads,
+      run_trimmomatic     = input$lnch_trimmomatic,
+      cleaning_parameters = input$lnch_cleaning_params,
+      assembler           = input$lnch_assembler,
+      assembly_options    = input$lnch_assembly_opts,
+      min_contig_length   = input$lnch_min_contig,
+      use_singletons      = input$lnch_singletons,
+      no_cog              = input$lnch_no_cog,
+      no_kegg             = input$lnch_no_kegg,
+      no_pfam             = input$lnch_no_pfam,
+      eukaryotes          = input$lnch_euk,
+      doublepass          = input$lnch_dbl,
+      extdb               = extdb_val,
+      consensus           = lnch_current_consensus(),
+      mapper              = input$lnch_mapper,
+      mapping_options     = input$lnch_mapping_opts,
+      no_bins             = input$lnch_no_bins,
+      only_bins           = input$lnch_only_bins,
+      binners             = input$lnch_binners
+    )
+    paste(cmd, collapse = " \\\n  ")
+  })
+
+  output$lnch_cmd_preview <- renderText({ lnch_preview_cmd() })
+
+  observeEvent(input$lnch_run, {
+    req(lnch_samples_path(), lnch_input_path(), lnch_workdir_path(), input$lnch_project_name)
+    extdb_val <- NULL
+    df_file   <- tryCatch(
+      shinyFiles::parseFilePaths(lnch_roots, input$lnch_extdb),
+      error = function(e) data.frame()
+    )
+    if (nrow(df_file) > 0) extdb_val <- df_file$datapath
+    lnch_log_buffer("")
+    res <- tryCatch({
+      run_squeezemeta(
+        program             = input$lnch_program,
+        samples_file        = lnch_samples_path(),
+        input_dir           = lnch_input_path(),
+        project_name        = input$lnch_project_name,
+        workdir             = lnch_workdir_path(),
+        mode                = input$lnch_mode,
+        threads             = input$lnch_threads,
+        run_trimmomatic     = input$lnch_trimmomatic,
+        cleaning_parameters = input$lnch_cleaning_params,
+        assembler           = input$lnch_assembler,
+        assembly_options    = input$lnch_assembly_opts,
+        min_contig_length   = input$lnch_min_contig,
+        use_singletons      = input$lnch_singletons,
+        no_cog              = input$lnch_no_cog,
+        no_kegg             = input$lnch_no_kegg,
+        no_pfam             = input$lnch_no_pfam,
+        eukaryotes          = input$lnch_euk,
+        doublepass          = input$lnch_dbl,
+        extdb               = extdb_val,
+        consensus           = lnch_current_consensus(),
+        mapper              = input$lnch_mapper,
+        mapping_options     = input$lnch_mapping_opts,
+        no_bins             = input$lnch_no_bins,
+        only_bins           = input$lnch_only_bins,
+        binners             = input$lnch_binners
+      )
+    }, error = function(e) {
+      showNotification(paste("Error:", e$message), type = "error", duration = NULL)
+      NULL
+    })
+    if (!is.null(res)) {
+      lnch_status("Running")
+      lnch_proc(res$process)
+      showNotification("Pipeline started", type = "message")
+    }
+  })
+
+  observe({
+    p <- lnch_proc()
+    req(p)
+    invalidateLater(1000, session)
+    strip_ansi <- function(x) gsub("\033\\[[0-9;]*m", "", x)
+    out       <- strip_ansi(p$read_output_lines())
+    err       <- strip_ansi(p$read_error_lines())
+    new_lines <- c(out[!grepl("Broken pipe", out)], err)
+    if (length(new_lines) > 0) {
+      lnch_log_buffer(paste(lnch_log_buffer(), paste(new_lines, collapse = "\n"), sep = "\n"))
+      session$sendCustomMessage("lnch_scroll_log", list())
+    }
+    if (!p$is_alive()) {
+      lnch_status(if (p$get_exit_status() == 0) "Finished" else "Error")
+      lnch_proc(NULL)
+    }
+  })
+
+  observeEvent(input$lnch_stop, {
+    showModal(modalDialog(
+      title  = "Confirm abort",
+      "Are you sure you want to abort the running pipeline?",
+      footer = tagList(
+        modalButton("Cancel"),
+        actionButton("lnch_confirm_abort", "Yes, abort", class = "btn-danger")
+      )
+    ))
+  })
+
+  observeEvent(input$lnch_confirm_abort, {
+    removeModal()
+    p <- lnch_proc()
+    if (!is.null(p) && p$is_alive()) {
+      p$kill_tree()
+      lnch_log_buffer(paste(lnch_log_buffer(), "\n--- ABORTED BY USER ---\n", sep = "\n"))
+      lnch_status("Aborted")
+      showNotification("Pipeline aborted", type = "warning")
+      lnch_proc(NULL)
+    }
+  })
+
+  observeEvent(input$lnch_no_bins, {
+    if (input$lnch_no_bins) {
+      updateCheckboxInput(session, "lnch_only_bins", value = FALSE)
+      updateCheckboxGroupInput(session, "lnch_binners", selected = character(0))
+    } else {
+      updateCheckboxGroupInput(session, "lnch_binners", selected = c("concoct", "metabat2"))
+    }
+  })
+
+  observeEvent(input$lnch_only_bins, {
+    if (input$lnch_only_bins) updateCheckboxInput(session, "lnch_no_bins", value = FALSE)
+  })
+
+  output$lnch_log <- renderUI({
+    tags$pre(style = "margin:0; white-space:pre-wrap; color:#cdd6f4;", lnch_log_buffer())
+  })
+
 }
