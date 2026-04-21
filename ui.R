@@ -8,7 +8,11 @@ ui <- page_navbar(
   window_title = "Watermelon",
   theme = sqm_theme,
   navbar_options = navbar_options(theme = "light", bg = "#ffffff"),
-  header = tagList(useShinyjs(), tags$head(tags$style(HTML(custom_css)))),
+  header = tagList(
+    useShinyjs(),
+    tags$head(tags$style(HTML(custom_css))),
+    tags$script(HTML("document.body.classList.add('sqm-no-project');"))
+  ),
   # ── Run ─────────────────────────────────────────────────────────────────
   nav_panel(
     "Run",
@@ -111,17 +115,9 @@ ui <- page_navbar(
           )
         ),
 
-        # ---- Command preview ----
-        tags$div(style = "margin-top:6px;",
-          tags$div(class = "form-label", "Command preview"),
-          verbatimTextOutput("lnch_cmd_preview", placeholder = TRUE)
-        ),
-
         # ---- Run / Abort ----
-        tags$div(id = "launcher-run-bar",
-          actionButton("lnch_run",  "\u25b6 Run",   class = "btn-primary btn-sm"),
-          actionButton("lnch_stop", "\u25a0 Abort",  class = "btn-danger  btn-sm")
-        )
+        actionButton("lnch_run",  "\u25b6 Run",   class = "btn-primary w-100 mb-1"),
+        actionButton("lnch_stop", "\u25a0 Abort",  class = "btn-danger  w-100")
       ),
 
       # ── Log panel ──────────────────────────────────────────────────────

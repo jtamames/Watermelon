@@ -403,10 +403,51 @@ table.dataTable tbody tr:hover { background: #eef5fc !important; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--blue); }
 
+/* Accordion buttons — match app theme */
+.accordion-button {
+  background: var(--panel) !important;
+  color: var(--blue) !important;
+  font-family: 'IBM Plex Mono', monospace !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.06em !important;
+  text-transform: uppercase !important;
+  padding: 0.45rem 0.75rem !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.accordion-button:not(.collapsed) {
+  background: var(--panel) !important;
+  color: var(--blue) !important;
+  box-shadow: none !important;
+}
+.accordion-button::after {
+  filter: invert(30%) sepia(80%) saturate(500%) hue-rotate(190deg);
+}
+.accordion-item {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 5px !important;
+  margin-bottom: 3px !important;
+}
+.accordion-body {
+  background: var(--card) !important;
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.82rem !important;
+}
+
+/* Hide analysis tabs until project loads (body.sqm-no-project is set by default,
+   removed by the server once a project is ready) */
+body.sqm-no-project [data-value='Plots'],
+body.sqm-no-project [data-value='Tables'],
+body.sqm-no-project [data-value='Krona'],
+body.sqm-no-project [data-value='Pathways'],
+body.sqm-no-project [data-value='Multivariate'] { display: none !important; }
+
 /* ── Launcher tab ──────────────────────────────────────────────── */
 #launcher-log-container {
-  background: #1e1e2e;
-  color: #cdd6f4;
+  background: var(--panel);
+  color: var(--text);
   padding: 12px;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 12px;
@@ -416,13 +457,13 @@ table.dataTable tbody tr:hover { background: #eef5fc !important; }
   border: 1px solid var(--border);
 }
 #launcher-cmd-preview {
-  background: #1e1e2e;
-  color: #a6e3a1;
+  background: var(--panel);
+  color: var(--blue);
   padding: 10px 12px;
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
   border-radius: 6px;
-  border: 1px solid #313244;
+  border: 1px solid var(--border);
   white-space: pre-wrap;
   word-break: break-all;
   min-height: 36px;
@@ -440,7 +481,6 @@ table.dataTable tbody tr:hover { background: #eef5fc !important; }
 .launcher-status-finished { background-color: var(--teal)    !important; }
 .launcher-status-error    { background-color: #c0392b        !important; }
 .launcher-status-aborted  { background-color: #d68910        !important; }
-#launcher-run-bar { display:flex; gap:6px; margin-top:8px; }
 "
 build_func_pattern <- function(search_text) {
   search_text <- trimws(search_text)

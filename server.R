@@ -7,9 +7,7 @@ server <- function(input, output, session) {
   creator_name <- reactiveVal(NULL)
   is_sqm_full  <- reactiveVal(FALSE)
 
-  # Hide analysis tabs until a project is loaded
   ANALYSIS_TABS <- c("Plots", "Tables", "Krona", "Pathways", "Multivariate")
-  for (tab in ANALYSIS_TABS) nav_hide("main_navbar", tab)
 
 
   # ── Dynamic plot type selector ──
@@ -363,6 +361,7 @@ server <- function(input, output, session) {
                   grepl("SqueezeMeta", creator_name() %||% "", ignore.case = TRUE)
         proj <- if (is_sqm) loadSQM(tp) else loadSQMlite(tp)
         sqm_data(proj); is_sqm_full(is_sqm); status("ready")
+        shinyjs::runjs("document.body.classList.remove('sqm-no-project');")
         for (tab in ANALYSIS_TABS) nav_show("main_navbar", tab)
       }, error = function(e) { status("error"); showNotification(paste("Error:", e$message), type = "error", duration = 8) })
     })
@@ -3679,45 +3678,6 @@ server <- function(input, output, session) {
 
 
 
-  lnch_preview_cmd <- reactive({
-    s_path <- tryCatch(lnch_samples_path(), error = function(e) NULL)
-    i_path <- tryCatch(lnch_input_path(),   error = function(e) NULL)
-    w_path <- tryCatch(lnch_workdir_path(), error = function(e) NULL)
-    pname  <- input$lnch_project_name
-    if (is.null(s_path) || is.null(i_path) || is.null(w_path) || !nzchar(pname))
-      return("# Fill in project name and paths to see the command")
-    extdb_val <- tryCatch(lnch_extdb_path(), error = function(e) NULL)
-    cmd <- build_sm_command(
-      program             = input$lnch_program,
-      samples_file        = s_path,
-      input_dir           = i_path,
-      project_name        = pname,
-      workdir             = w_path,
-      mode                = input$lnch_mode,
-      threads             = input$lnch_threads,
-      run_trimmomatic     = input$lnch_trimmomatic,
-      cleaning_parameters = input$lnch_cleaning_params,
-      assembler           = input$lnch_assembler,
-      assembly_options    = input$lnch_assembly_opts,
-      min_contig_length   = input$lnch_min_contig,
-      use_singletons      = input$lnch_singletons,
-      no_cog              = input$lnch_no_cog,
-      no_kegg             = input$lnch_no_kegg,
-      no_pfam             = input$lnch_no_pfam,
-      eukaryotes          = input$lnch_euk,
-      doublepass          = input$lnch_dbl,
-      extdb               = extdb_val,
-      consensus           = lnch_current_consensus(),
-      mapper              = input$lnch_mapper,
-      mapping_options     = input$lnch_mapping_opts,
-      no_bins             = input$lnch_no_bins,
-      only_bins           = input$lnch_only_bins,
-      binners             = input$lnch_binners
-    )
-    paste(cmd, collapse = " \\\n  ")
-  })
-
-  output$lnch_cmd_preview <- renderText({ lnch_preview_cmd() })
 
   observeEvent(input$lnch_run, {
     req(lnch_samples_path(), lnch_input_path(), lnch_workdir_path(), input$lnch_project_name)
@@ -3767,6 +3727,36 @@ server <- function(input, output, session) {
     }
   })
 
+  # Helper: load a finished SqueezeMeta project into Watermelon
+  do_load_sqm <- function(proj_dir, tables_dir) {
+    status("loading")
+    shinyjs::delay(200, {
+      tryCatch({
+        creator_file <- file.path(proj_dir, "creator.txt")
+        is_sqm <- if (file.exists(creator_file))
+          grepl("SqueezeMeta", trimws(readLines(creator_file, n = 1, warn = FALSE)),
+                ignore.case = TRUE)
+        else TRUE
+        tp   <- if (is_sqm) proj_dir else tables_dir
+        proj <- if (is_sqm) loadSQM(tp) else loadSQMlite(tp)
+        sqm_data(proj)
+        is_sqm_full(is_sqm)
+        status("ready")
+        creator_name(if (file.exists(creator_file))
+          trimws(readLines(creator_file, n = 1, warn = FALSE)) else "SqueezeMeta")
+        tables_path(tp)
+        shinyjs::runjs("document.body.classList.remove('sqm-no-project');")
+        for (tab in ANALYSIS_TABS) nav_show("main_navbar", tab)
+        nav_select("main_navbar", "Load")
+        showNotification("Project loaded successfully.", type = "message", duration = 5)
+      }, error = function(e) {
+        status("error")
+        showNotification(paste("Could not load project:", e$message),
+                         type = "warning", duration = 10)
+      })
+    })
+  }
+
   observe({
     p <- lnch_proc()
     req(p)
@@ -3780,8 +3770,88 @@ server <- function(input, output, session) {
       session$sendCustomMessage("lnch_scroll_log", list())
     }
     if (!p$is_alive()) {
-      lnch_status(if (p$get_exit_status() == 0) "Finished" else "Error")
+      exit_code <- p$get_exit_status()
+      lnch_status(if (exit_code == 0) "Finished" else "Error")
       lnch_proc(NULL)
+
+      # Auto-load the project into Watermelon when the run completes successfully
+      if (exit_code == 0) {
+        proj_dir <- file.path(lnch_workdir_path(), input$lnch_project_name)
+        if (dir.exists(proj_dir)) {
+
+          # Determine which table-generation script to use
+          tables_script <- switch(input$lnch_program,
+            "SqueezeMeta.pl"   = "sqm2tables.py",
+            "sqm_reads.pl"     = "sqmreads2tables.py",
+            "sqm_longreads.pl" = "sqmreads2tables.py",
+            "sqm2tables.py"
+          )
+          tables_dir <- file.path(proj_dir, "results", "tables")
+
+          # Run table-generation script if tables don't exist yet
+          if (!dir.exists(tables_dir) || length(list.files(tables_dir)) == 0) {
+            showNotification(
+              paste("Run finished. Generating tables with", tables_script, "..."),
+              type = "message", duration = 6
+            )
+            lnch_log_buffer(paste0(lnch_log_buffer(),
+              "\n--- Generating tables with ", tables_script, " ---\n"))
+
+            tbl_script_path <- Sys.which(tables_script)
+            if (!nzchar(tbl_script_path)) {
+              showNotification(paste(tables_script, "not found in PATH."),
+                               type = "error", duration = 10)
+            } else {
+              tables_proc <- tryCatch(
+                processx::process$new(
+                  command   = tbl_script_path,
+                  args      = c(proj_dir, tables_dir),
+                  stdout    = "|", stderr = "|",
+                  supervise = TRUE, wd = proj_dir
+                ),
+                error = function(e) {
+                  showNotification(paste("Could not run", tables_script, ":", e$message),
+                                   type = "warning", duration = 10)
+                  NULL
+                }
+              )
+
+              if (!is.null(tables_proc)) {
+                # Poll until the script finishes, streaming output to the log
+                poll_tables <- function() {
+                  out <- tables_proc$read_output_lines()
+                  err <- tables_proc$read_error_lines()
+                  new_lines <- c(out, err)
+                  if (length(new_lines) > 0)
+                    lnch_log_buffer(paste(lnch_log_buffer(),
+                      paste(new_lines, collapse = "\n"), sep = "\n"))
+                  if (tables_proc$is_alive()) {
+                    shinyjs::delay(1000, poll_tables())
+                  } else {
+                    tbl_exit <- tables_proc$get_exit_status()
+                    if (tbl_exit != 0) {
+                      showNotification(
+                        paste(tables_script, "failed (exit", tbl_exit, "). Check the log."),
+                        type = "error", duration = 10)
+                      status("error")
+                    } else {
+                      lnch_log_buffer(paste0(lnch_log_buffer(),
+                        "\n--- Tables generated successfully ---\n"))
+                      do_load_sqm(proj_dir, tables_dir)
+                    }
+                  }
+                }
+                poll_tables()
+              }
+            }
+
+          } else {
+            # Tables already exist — load directly
+            showNotification("Run finished. Loading project...", type = "message", duration = 4)
+            do_load_sqm(proj_dir, tables_dir)
+          }
+        }
+      }
     }
   })
 
@@ -3822,7 +3892,7 @@ server <- function(input, output, session) {
   })
 
   output$lnch_log <- renderUI({
-    tags$pre(style = "margin:0; white-space:pre-wrap; color:#cdd6f4;", lnch_log_buffer())
+    tags$pre(style = "margin:0; white-space:pre-wrap;", lnch_log_buffer())
   })
 
 }
