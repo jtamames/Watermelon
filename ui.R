@@ -124,9 +124,11 @@ ui <- page_navbar(
       card(
         card_header(
           tags$div(style = "display:flex; justify-content:space-between; align-items:center;",
-            "Execution log", uiOutput("lnch_status_badge"))
+            "Execution log",
+            uiOutput("lnch_status_badge"))
         ),
         card_body(
+          uiOutput("lnch_step_display"),
           tags$div(id = "launcher-log-container", uiOutput("lnch_log")),
           tags$script(HTML("
             // Auto-scroll log

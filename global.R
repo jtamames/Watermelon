@@ -436,6 +436,19 @@ table.dataTable tbody tr:hover { background: #eef5fc !important; }
   font-size: 0.82rem !important;
 }
 
+/* Step display in Run tab log panel */
+#lnch-step-display {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--blue);
+  padding: 10px 4px 6px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 2rem;
+}
+
 /* Hide analysis tabs until project loads (body.sqm-no-project is set by default,
    removed by the server once a project is ready) */
 body.sqm-no-project [data-value='Plots'],

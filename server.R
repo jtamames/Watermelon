@@ -3631,6 +3631,7 @@ server <- function(input, output, session) {
   lnch_log_buffer        <- reactiveVal("")
   lnch_status            <- reactiveVal("Idle")
   lnch_current_consensus <- reactiveVal(50)
+  lnch_current_step      <- reactiveVal(NULL)
 
   session$onFlushed(function() {
     observe({
@@ -3653,6 +3654,13 @@ server <- function(input, output, session) {
       tags$span(class = "spinner-border spinner-border-sm me-1",
                 role = "status", `aria-hidden` = "true")
     tags$span(class = paste("badge rounded-pill", cls), spinner, s)
+  })
+
+  output$lnch_step_display <- renderUI({
+    step <- lnch_current_step()
+    if (is.null(step) || lnch_status() %in% c("Idle", "Finished", "Error", "Aborted"))
+      return(NULL)
+    tags$div(id = "lnch-step-display", step)
   })
 
   observeEvent(input$lnch_program, {
@@ -3688,6 +3696,7 @@ server <- function(input, output, session) {
     )
     if (nrow(df_file) > 0) extdb_val <- df_file$datapath
     lnch_log_buffer("")
+    lnch_current_step(NULL)
     res <- tryCatch({
       run_squeezemeta(
         program             = input$lnch_program,
@@ -3768,6 +3777,18 @@ server <- function(input, output, session) {
     if (length(new_lines) > 0) {
       lnch_log_buffer(paste(lnch_log_buffer(), paste(new_lines, collapse = "\n"), sep = "\n"))
       session$sendCustomMessage("lnch_scroll_log", list())
+      # Detect STEP messages: e.g. "[3 seconds]: STEP2 -> RNA PREDICTION: ..."
+      step_lines <- grep("STEP[0-9]+\\s*->", new_lines, value = TRUE)
+      if (length(step_lines) > 0) {
+        last <- step_lines[length(step_lines)]
+        # Extract just "STEP<n> -> description" dropping the "[N seconds]: " prefix
+        step_txt <- sub(".*?(STEP[0-9]+\\s*->\\s*.*)", "\\1", last)
+        # Remove script filename: e.g. "01.run_all_assemblies.pl" or "02.rnas.pl"
+        step_txt <- gsub("\\s*[0-9]+\\.[a-zA-Z0-9_]+\\.pl\\b", "", step_txt)
+        step_txt <- gsub("\\s{2,}", " ", trimws(step_txt))
+        step_txt <- gsub(":\\s*$", "", step_txt)  # remove trailing colon
+        lnch_current_step(step_txt)
+      }
     }
     if (!p$is_alive()) {
       exit_code <- p$get_exit_status()
