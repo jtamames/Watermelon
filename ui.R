@@ -377,4 +377,12 @@ nav_panel("Load",
       )
     )
   ),
+  nav_spacer(),
+  nav_item(
+    tags$img(
+      src    = paste0("data:image/png;base64,", CSIC_LOGO_B64),
+      height = "48px",
+      style  = "margin: 2px 12px 2px 0; opacity:0.92;"
+    )
+  )
 )
