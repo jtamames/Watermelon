@@ -430,6 +430,7 @@ server <- function(input, output, session) {
             }
           })
           proj <- do.call(combineSQM, c(projects, list(rescale_tpm = TRUE, rescale_copy_number = TRUE)))
+          if (!inherits(proj, c("SQM", "SQMlite"))) class(proj) <- c("SQMlite", class(proj))
           sqm_data(proj); is_sqm_full(FALSE); status("ready")
           shinyjs::runjs("document.body.classList.remove('sqm-no-project');")
           for (tab in ANALYSIS_TABS) nav_show("main_navbar", tab)

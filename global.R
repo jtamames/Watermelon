@@ -349,14 +349,14 @@ table.dataTable tbody tr:hover { background: #eef5fc !important; }
   color: #c0392b; border-radius: 4px; padding: 1px 7px; font-size: 0.72rem;
   font-family: 'IBM Plex Mono', monospace; margin-top: 4px;
 }
-.sqm-section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow-x: auto; margin-bottom: 12px; }
+.sqm-section { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 12px; }
 .sqm-section-header {
   background: var(--panel); border-bottom: 1px solid var(--border); padding: 7px 14px;
   font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; font-weight: 600;
   letter-spacing: 0.09em; text-transform: uppercase; color: var(--blue);
 }
-.sqm-section-body { padding: 10px 14px; }
-.sqm-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.sqm-section-body { padding: 10px 14px; overflow-x: auto; }
+.sqm-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
 .sqm-table thead th {
   background: var(--panel); color: var(--blue); font-family: 'IBM Plex Mono', monospace;
   font-size: 0.72rem; letter-spacing: 0.05em; padding: 5px 10px;
@@ -454,9 +454,7 @@ table.dataTable tbody tr:hover { background: #eef5fc !important; }
   min-height: 2rem;
 }
 
-/* Allow horizontal scroll in main content panels */
-.bslib-sidebar-layout > .main { overflow-x: auto; }
-.card-body { overflow-x: auto; }
+
 
 /* Hide analysis tabs until project loads (body.sqm-no-project is set by default,
    removed by the server once a project is ready) */
