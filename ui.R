@@ -377,6 +377,66 @@ nav_panel("Load",
       )
     )
   ),
+  nav_panel("About",
+    tags$div(style = "max-width:760px; margin: 2rem auto; padding: 0 1rem;",
+
+      tags$div(class = "sqm-section",
+        tags$div(class = "sqm-section-header", "Watermelon"),
+        tags$div(class = "sqm-section-body",
+          tags$p(
+            tags$strong("Watermelon"),
+            " is an interactive Shiny dashboard for running, visualising and exploring ",
+            tags$a("SqueezeMeta", href = "https://github.com/jtamames/SqueezeMeta", target = "_blank"),
+            " metagenomics results."
+          ),
+          tags$p(
+            tags$span(style = "color:var(--muted);", "©"),
+            " Javier Tamames, CNB-CSIC (Madrid, Spain) 2026."
+          )
+        )
+      ),
+
+      tags$div(class = "sqm-section",
+        tags$div(class = "sqm-section-header", "Source code & support"),
+        tags$div(class = "sqm-section-body",
+          tags$p(
+            "Source code is available on GitHub: ",
+            tags$a("github.com/jtamames/Watermelon",
+              href = "https://github.com/jtamames/Watermelon", target = "_blank")
+          ),
+          tags$p(
+            "For bug reports and questions please open an issue at ",
+            tags$a("github.com/jtamames/Watermelon/issues",
+              href = "https://github.com/jtamames/Watermelon/issues", target = "_blank"),
+            "."
+          )
+        )
+      ),
+
+      tags$div(class = "sqm-section",
+        tags$div(class = "sqm-section-header", "Citation"),
+        tags$div(class = "sqm-section-body",
+          tags$p("If you use SqueezeMeta or SQMtools in your research, please cite:"),
+          tags$ul(
+            tags$li(
+              "Tamames & Puente-Sánchez (2019). SqueezeMeta, a highly portable metagenomics pipeline based on simultaneous coassembly of multiple samples. ",
+              tags$em("Frontiers in Microbiology."),
+              " doi: ",
+              tags$a("10.3389/fmicb.2018.03349",
+                href = "https://doi.org/10.3389/fmicb.2018.03349", target = "_blank")
+            ),
+            tags$li(
+              "Puente-Sánchez et al. (2020). SQMtools: automated processing and visual analysis of ‘omics data with R and anvi’o. ",
+              tags$em("BMC Bioinformatics."),
+              " doi: ",
+              tags$a("10.1186/s12859-020-03703-2",
+                href = "https://doi.org/10.1186/s12859-020-03703-2", target = "_blank")
+            )
+          )
+        )
+      )
+    )
+  ),
   nav_spacer(),
   nav_item(
     tags$img(
