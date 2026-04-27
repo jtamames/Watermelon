@@ -2,6 +2,7 @@ server <- function(input, output, session) {
   roots        <- c(home = normalizePath("~"), root = "/")
   sqm_data     <- reactiveVal(NULL)
   status       <- reactiveVal("idle")
+  multi_dirs   <- reactiveVal(character(0))  # accumulates selected dirs for "Load multiple"
   tables_path  <- reactiveVal(NULL)
   need_manual  <- reactiveVal(FALSE)
   creator_name <- reactiveVal(NULL)
@@ -268,11 +269,63 @@ server <- function(input, output, session) {
 
   shinyDirChoose(input, "dir_project",       roots = roots)
   shinyDirChoose(input, "dir_manual_tables", roots = roots)
+  shinyDirChoose(input, "dir_multi_add",     roots = roots)
   path_project <- reactive({ req(input$dir_project); parseDirPath(roots, input$dir_project) })
   output$path_project <- renderText({ tryCatch(path_project(), error = function(e) "") })
 
+  # ---- Load multiple UI ----
+  output$multi_dirs_ui <- renderUI({
+    if ((input$load_mode %||% "project") != "multiple") return(NULL)
+    dirs <- multi_dirs()
+    tagList(
+      help_label("Project directories",
+        "Select each SqueezeMeta project directory individually. They will be combined with combineSQM().",
+        style = "margin-top:0.25rem;"),
+      shinyDirButton("dir_multi_add", "Add directory", "Choose a project directory",
+        multiple = FALSE, class = "btn-default w-100 mb-1"),
+      if (length(dirs) > 0)
+        tags$ul(style = "margin:4px 0 6px 0; padding-left:16px; font-size:0.8rem;",
+          lapply(seq_along(dirs), function(i)
+            tags$li(style = "display:flex; justify-content:space-between; align-items:center;",
+              tags$span(style = "word-break:break-all;", basename(dirs[i])),
+              actionLink(paste0("rm_dir_", i), "×",
+                style = "color:#c0392b; margin-left:6px; flex-shrink:0;")
+            )
+          )
+        ),
+      if (length(dirs) == 0)
+        tags$div(class = "path-info", style = "color:#7a90a8;", "No directories selected yet.")
+    )
+  })
+
+  # Add a directory to the multi list
+  observeEvent(input$dir_multi_add, {
+    d <- tryCatch(parseDirPath(roots, input$dir_multi_add), error = function(e) NULL)
+    req(d); req(nzchar(d))
+    if (!d %in% multi_dirs()) multi_dirs(c(multi_dirs(), d))
+  })
+
+  # Remove buttons for each listed directory (dynamic observers)
+  observe({
+    dirs <- multi_dirs()
+    lapply(seq_along(dirs), function(i) {
+      local({
+        idx <- i
+        observeEvent(input[[paste0("rm_dir_", idx)]], {
+          current <- multi_dirs()
+          if (idx <= length(current)) multi_dirs(current[-idx])
+        }, ignoreInit = TRUE, once = TRUE)
+      })
+    })
+  })
+
+  # Reset multi list when mode changes
+  observeEvent(input$load_mode, { multi_dirs(character(0)) })
+
   output$project_dir_ui <- renderUI({
-    if ((input$load_mode %||% "project") == "project") {
+    mode <- input$load_mode %||% "project"
+    if (mode == "multiple") return(NULL)
+    if (mode == "project") {
       tagList(
         help_label("Project directory",
           "SqueezeMeta, SQM_reads or SQM_longreads project directory. It will look for a directory 'tables' in that directory, otherwise will ask for the appropriate location of the tables.",
@@ -346,6 +399,50 @@ server <- function(input, output, session) {
   })
   observeEvent(input$load_project, {
     mode <- input$load_mode %||% "project"
+
+    # ---- Load multiple mode ----
+    if (mode == "multiple") {
+      dirs <- multi_dirs()
+      if (length(dirs) < 2) {
+        showNotification("Please select at least 2 project directories.", type = "error", duration = 6)
+        return()
+      }
+      for (d in dirs) {
+        if (!dir.exists(d)) {
+          showNotification(paste("Directory not found:", d), type = "error", duration = 6)
+          return()
+        }
+      }
+      status("loading")
+      shinyjs::delay(50, {
+        tryCatch({
+          # Load each project individually then combine
+          projects <- lapply(dirs, function(d) {
+            creator_file <- file.path(d, "creator.txt")
+            is_sqm <- if (file.exists(creator_file))
+              grepl("SqueezeMeta", trimws(readLines(creator_file, n = 1, warn = FALSE)),
+                    ignore.case = TRUE)
+            else FALSE
+            if (is_sqm) loadSQM(d) else {
+              tp <- file.path(d, "results", "tables")
+              if (!dir.exists(tp)) tp <- d
+              loadSQMlite(tp)
+            }
+          })
+          proj <- do.call(combineSQM, c(projects, list(rescale_tpm = TRUE, rescale_copy_number = TRUE)))
+          sqm_data(proj); is_sqm_full(FALSE); status("ready")
+          shinyjs::runjs("document.body.classList.remove('sqm-no-project');")
+          for (tab in ANALYSIS_TABS) nav_show("main_navbar", tab)
+          showNotification(paste(length(dirs), "projects combined successfully."), type = "message", duration = 5)
+        }, error = function(e) {
+          status("error")
+          showNotification(paste("Error combining projects:", e$message), type = "error", duration = 10)
+        })
+      })
+      return()
+    }
+
+    # ---- Single project / tables mode ----
     tp <- if (mode == "tables") {
       tryCatch(parseDirPath(roots, input$dir_manual_tables), error = function(e) NULL)
     } else {
@@ -424,8 +521,11 @@ server <- function(input, output, session) {
     panels <- list()
 
     # \u2500\u2500 Project name badge (both SQM and SQMlite) \u2500\u2500
-    project_name <- tryCatch(proj$misc$project_name %||% "", error=function(e) "")
-    if (nchar(project_name)>0) panels[["name"]] <- tags$div(
+    project_name <- tryCatch({
+      pn <- proj$misc$project_name %||% ""
+      if (length(pn) > 1) paste(pn, collapse = " + ") else pn
+    }, error=function(e) "")
+    if (nchar(project_name[1])>0) panels[["name"]] <- tags$div(
       style="margin-bottom:12px;display:flex;align-items:center;gap:10px;",
       tags$span(style="font-family:'IBM Plex Mono',monospace;font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;","Project"),
       tags$span(class="project-badge",style="font-size:0.85rem;padding:3px 10px;",project_name))
@@ -537,7 +637,7 @@ server <- function(input, output, session) {
 
         # \u2500\u2500 Extract project name \u2500\u2500
         name_line <- grep("BASE PROJECT NAME:", raw, value = TRUE)
-        if (length(name_line) > 0 && nchar(project_name) == 0) {
+        if (length(name_line) > 0 && nchar(project_name[1]) == 0) {
           project_name <- trimws(sub(".*BASE PROJECT NAME:\\s*", "", name_line[1]))
           # update badge if not already set
           panels[["name"]] <- tags$div(
