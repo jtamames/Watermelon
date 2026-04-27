@@ -3701,19 +3701,32 @@ server <- function(input, output, session) {
 
   lnch_roots <- c(home = normalizePath("~"))
 
-  shinyFiles::shinyFileChoose(input, "lnch_samples_file", roots = lnch_roots)
-  shinyFiles::shinyDirChoose(input,  "lnch_input_dir",    roots = lnch_roots)
-  shinyFiles::shinyDirChoose(input,  "lnch_workdir",      roots = lnch_roots)
-  shinyFiles::shinyFileChoose(input, "lnch_extdb",        roots = lnch_roots)
+  shinyFiles::shinyFileChoose(input, "lnch_samples_file",   roots = lnch_roots)
+  shinyFiles::shinyDirChoose(input,  "lnch_input_dir",     roots = lnch_roots)
+  shinyFiles::shinyDirChoose(input,  "lnch_workdir",       roots = lnch_roots)
+  shinyFiles::shinyFileChoose(input, "lnch_extdb",         roots = lnch_roots)
+  shinyFiles::shinyDirChoose(input,  "lnch_sf_dir",        roots = lnch_roots)
+  shinyFiles::shinyDirChoose(input,  "lnch_sf_savedir",    roots = lnch_roots)
 
   lnch_samples_path <- reactive({
+    # Use path from the samples file creator if set
+    rv_path <- lnch_samples_file_path_rv()
+    if (!is.null(rv_path) && nzchar(rv_path)) return(rv_path)
     req(input$lnch_samples_file)
     shinyFiles::parseFilePaths(lnch_roots, input$lnch_samples_file)$datapath
   })
+
+  # Reset rv when user picks a file manually
+  observeEvent(input$lnch_samples_file, { lnch_samples_file_path_rv(NULL) })
   lnch_input_path <- reactive({
+    rv <- lnch_input_dir_rv()
+    if (!is.null(rv) && nzchar(rv)) return(rv)
     req(input$lnch_input_dir)
     shinyFiles::parseDirPath(lnch_roots, input$lnch_input_dir)
   })
+
+  # Reset rv when user picks manually
+  observeEvent(input$lnch_input_dir, { lnch_input_dir_rv(NULL) })
   lnch_workdir_path <- reactive({
     req(input$lnch_workdir)
     shinyFiles::parseDirPath(lnch_roots, input$lnch_workdir)
@@ -3836,6 +3849,196 @@ server <- function(input, output, session) {
       showNotification("Pipeline started", type = "message")
     }
   })
+
+  # ===========================================================================
+  # SAMPLES FILE CREATOR
+  # ===========================================================================
+
+  sf_dir        <- reactiveVal(NULL)   # selected FASTQ directory
+  sf_files      <- reactiveVal(list()) # list of file entries: name, sample, pair
+  sf_savedir    <- reactiveVal(NULL)   # where to save the result
+  lnch_input_dir_rv <- reactiveVal(NULL)  # override input dir from samples creator
+
+  # Open the creator modal when button clicked
+  observeEvent(input$lnch_create_samples, {
+    showModal(modalDialog(
+      title = "Create samples file",
+      size  = "l",
+      easyClose = FALSE,
+      footer = tagList(
+        actionButton("sf_save",   "Save samples file", class = "btn-primary"),
+        actionButton("sf_cancel", "Cancel",            class = "btn-default")
+      ),
+      tags$div(
+        # Step 1: pick FASTQ directory
+        tags$div(class = "sidebar-box",
+          tags$div(class = "form-label", "1. Select FASTQ directory"),
+          shinyDirButton("lnch_sf_dir", "Choose directory", "Select directory with FASTQ files",
+            class = "btn-default w-100 mb-1"),
+          tags$div(class = "launcher-file-path", textOutput("sf_dir_path", inline = TRUE))
+        ),
+        # Step 2: file list
+        uiOutput("sf_file_list_ui"),
+        # Step 3: save location
+        uiOutput("sf_save_ui")
+      )
+    ))
+  })
+
+  observeEvent(input$sf_cancel, {
+    removeModal(); sf_files(list()); sf_dir(NULL); sf_savedir(NULL)
+  })
+
+  # When FASTQ directory selected, list files and auto-set input dir
+  observeEvent(input$lnch_sf_dir, {
+    d <- tryCatch(shinyFiles::parseDirPath(lnch_roots, input$lnch_sf_dir), error = function(e) NULL)
+    req(d); req(nzchar(d))
+    sf_dir(d)
+    sf_savedir(d)  # default save dir = FASTQ dir
+    fq_files <- list.files(d, pattern = "\\.(fastq|fq|fasta|fa)(\\.gz)?$",
+                           ignore.case = TRUE, full.names = FALSE)
+    if (length(fq_files) == 0) {
+      showNotification("No FASTQ/FASTA files found in this directory.", type = "warning")
+      sf_files(list())
+    } else {
+      entries <- lapply(fq_files, function(f) {
+        base  <- sub("\\.(fastq|fq|fasta|fa)(\\.gz)?$", "", f, ignore.case = TRUE)
+        pair  <- if (grepl("_R2|_2$|\\.2$", base)) "pair2" else "pair1"
+        sname <- sub("_R[12]$|_[12]$|\\.[12]$", "", base)
+        list(file = f, sample = sname, pair = pair)
+      })
+      sf_files(entries)
+    }
+  })
+
+  # Save dir picker
+  observeEvent(input$lnch_sf_savedir, {
+    d <- tryCatch(shinyFiles::parseDirPath(lnch_roots, input$lnch_sf_savedir), error = function(e) NULL)
+    req(d); req(nzchar(d)); sf_savedir(d)
+  })
+
+  output$sf_dir_path <- renderText({ sf_dir() %||% "" })
+
+  output$sf_file_list_ui <- renderUI({
+    entries <- sf_files()
+    if (length(entries) == 0) return(NULL)
+    tags$div(class = "sidebar-box", style = "margin-top:8px;",
+      tags$div(class = "form-label", paste0("2. Set sample names and pair (", length(entries), " files found)")),
+      tags$div(style = "max-height:300px; overflow-y:auto;",
+        tags$table(style = "width:100%; border-collapse:collapse; font-size:0.82rem;",
+          tags$thead(
+            tags$tr(
+              tags$th(style = "padding:4px 6px; text-align:left; border-bottom:1px solid var(--border);", "File"),
+              tags$th(style = "padding:4px 6px; text-align:left; border-bottom:1px solid var(--border);", "Sample name"),
+              tags$th(style = "padding:4px 6px; text-align:left; border-bottom:1px solid var(--border);", "Pair")
+            )
+          ),
+          tags$tbody(
+            lapply(seq_along(entries), function(i) {
+              e <- entries[[i]]
+              tags$tr(style = if (i %% 2 == 0) "background:var(--panel);" else "",
+                tags$td(style = "padding:3px 6px; word-break:break-all;", e$file),
+                tags$td(style = "padding:3px 6px;",
+                  textInput(paste0("sf_sname_", i), NULL, value = e$sample,
+                    placeholder = "sample name", width = "100%")
+                ),
+                tags$td(style = "padding:3px 6px;",
+                  selectInput(paste0("sf_pair_", i), NULL,
+                    choices  = c("pair1", "pair2"),
+                    selected = e$pair,
+                    width = "90px")
+                )
+              )
+            })
+          )
+        )
+      )
+    )
+  })
+
+  output$sf_save_ui <- renderUI({
+    if (length(sf_files()) == 0) return(NULL)
+    tags$div(class = "sidebar-box", style = "margin-top:8px;",
+      tags$div(class = "form-label", "3. Save location"),
+      shinyDirButton("lnch_sf_savedir", "Choose save directory", "Select output directory",
+        class = "btn-default w-100 mb-1"),
+      tags$div(class = "launcher-file-path", textOutput("sf_savedir_path", inline = TRUE)),
+      tags$div(class = "form-label", style = "margin-top:6px;", "File name"),
+      textInput("sf_filename", NULL, value = "samples.tsv",
+        placeholder = "samples.tsv", width = "100%")
+    )
+  })
+
+  output$sf_savedir_path <- renderText({ sf_savedir() %||% "" })
+
+  # Save the samples file
+  observeEvent(input$sf_save, {
+    entries <- sf_files()
+    req(length(entries) > 0)
+    sdir <- sf_savedir()
+    req(!is.null(sdir) && nzchar(sdir))
+
+    n <- length(entries)
+    rows <- lapply(seq_len(n), function(i) {
+      sname <- trimws(input[[paste0("sf_sname_", i)]] %||% entries[[i]]$sample)
+      pair  <- input[[paste0("sf_pair_",  i)]] %||% entries[[i]]$pair
+      fname <- entries[[i]]$file   # just filename, not full path
+      c(sname, fname, pair)
+    })
+
+    # Validate: no empty sample names
+    empty <- which(sapply(rows, function(r) !nzchar(r[1])))
+    if (length(empty) > 0) {
+      showNotification(paste("Sample name missing for row(s):", paste(empty, collapse = ", ")),
+                       type = "error", duration = 6)
+      return()
+    }
+
+    # Validate: each sample must have only pair1, or both pair1 AND pair2
+    by_sample <- split(rows, sapply(rows, `[`, 1))
+    invalid <- Filter(function(srows) {
+      pairs <- sapply(srows, `[`, 3)
+      # Must have pair1; if pair2 present must also have pair1
+      !("pair1" %in% pairs)
+    }, by_sample)
+    if (length(invalid) > 0) {
+      showNotification(
+        paste("These samples have pair2 but no pair1:", paste(names(invalid), collapse = ", ")),
+        type = "error", duration = 8)
+      return()
+    }
+
+    # Validate: all samples must follow the same pairing scheme
+    # (all single-ended OR all paired-ended)
+    is_paired <- sapply(by_sample, function(srows) {
+      pairs <- sapply(srows, `[`, 3)
+      "pair2" %in% pairs
+    })
+    if (length(unique(is_paired)) > 1) {
+      showNotification(
+        "Mixed pairing: some samples are paired-end and others are single-end. All must be the same.",
+        type = "error", duration = 8)
+      return()
+    }
+
+    fname_out <- trimws(input$sf_filename %||% "samples.tsv")
+    if (!nzchar(fname_out)) fname_out <- "samples.tsv"
+    outpath <- file.path(sdir, fname_out)
+
+    lines <- sapply(rows, function(r) paste(r, collapse = "\t"))
+    writeLines(lines, outpath)
+
+    # Set input dir to the FASTQ directory
+    lnch_input_dir_rv(sf_dir())
+
+    removeModal()
+    sf_files(list()); sf_dir(NULL); sf_savedir(NULL)
+    showNotification(paste("Saved:", outpath), type = "message", duration = 6)
+    lnch_samples_file_path_rv(outpath)
+  })
+
+  # reactiveVal to override the samples file path when created via the wizard
+  lnch_samples_file_path_rv <- reactiveVal(NULL)
 
   # Helper: load a finished SqueezeMeta project into Watermelon
   do_load_sqm <- function(proj_dir, tables_dir) {

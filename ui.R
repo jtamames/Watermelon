@@ -39,7 +39,11 @@ ui <- page_navbar(
         # ---- Input Files ----
         tags$div(class = "sidebar-box",
           tags$div(class = "form-label", "Input Files"),
-          shinyFilesButton("lnch_samples_file", "Samples file (-s)", "Choose file", multiple = FALSE),
+          tags$div(style = "display:flex; gap:4px;",
+            shinyFilesButton("lnch_samples_file", "Samples file (-s)", "Choose file", multiple = FALSE),
+            actionButton("lnch_create_samples", "Create", class = "btn-default btn-sm",
+              title = "Create a new samples file by selecting FASTQ files from a directory")
+          ),
           tags$div(class = "launcher-file-path", textOutput("lnch_samples_path")),
           shinyDirButton("lnch_input_dir", "Input directory (-f)", "Choose directory", multiple = FALSE),
           tags$div(class = "launcher-file-path", textOutput("lnch_input_path")),
