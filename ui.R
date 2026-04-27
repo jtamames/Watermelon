@@ -2,7 +2,7 @@ ui <- page_navbar(
   id = "main_navbar",
   title = tags$img(
     src = paste0("data:image/png;base64,", WATERMELON_LOGO_B64),
-    height = "52px",
+    height = "62px",
     style = "margin: 2px 0;"
   ),
   window_title = "Watermelon",
@@ -381,7 +381,7 @@ nav_panel("Load",
   nav_item(
     tags$img(
       src    = paste0("data:image/png;base64,", CSIC_LOGO_B64),
-      height = "48px",
+      height = "58px",
       style  = "margin: 2px 12px 2px 0; opacity:0.92;"
     )
   )

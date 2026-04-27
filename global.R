@@ -213,7 +213,7 @@ body { background: var(--bg); color: var(--text); }
   padding-left: 0 !important;
   margin-left: 0 !important;
 }
-.nav-link { color: rgba(26,42,58,0.55) !important; font-size: 1.05rem; padding: 0.6rem 0.9rem !important; }
+.nav-link { color: rgba(26,42,58,0.55) !important; font-size: 1.2rem; padding: 0.6rem 0.9rem !important; }
 .nav-link:hover { color: #1a6eb5 !important; }
 .nav-link.active { color: #1a6eb5 !important; border-bottom: 2px solid #1a6eb5; font-weight: 500; }
 .card {
