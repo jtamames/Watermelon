@@ -109,17 +109,22 @@ message("KEGG_CATEGORIES: ", if(is.null(KEGG_CATEGORIES)) "NOT FOUND" else paste
 # tip: plain string, OR named character vector (names=labels, values=descriptions) -> bullet list
 help_label <- function(label, tip, style="margin-top:4px;") {
   if (is.character(tip) && length(tip) > 1 && !is.null(names(tip))) {
-    bullets <- paste(mapply(function(nm, desc) paste0("\u2022 ", nm, ": ", desc), names(tip), tip), collapse="\n")
-    tip_txt  <- paste0("Type of abundance measurement:\n", bullets)
+    bullets <- paste(mapply(function(nm, desc) paste0("<b>", nm, "</b>: ", desc), names(tip), tip), collapse="<br>")
+    tip_html <- paste0("Type of abundance measurement:<br>", bullets)
   } else {
-    tip_txt <- tip
+    # Convert \n to <br> for multi-line tips
+    tip_html <- gsub("\\n", "<br>", tip)
   }
   tags$div(class="form-label", style=style,
     label,
     tags$span(
       style=paste0("display:inline-block; margin-left:4px; cursor:help;",
                    "color:var(--muted); font-size:0.78rem; vertical-align:middle;"),
-      title=tip_txt, "\u24d8"
+      `data-bs-toggle`  = "tooltip",
+      `data-bs-placement` = "right",
+      `data-bs-html`    = "true",
+      `data-bs-title`   = tip_html,
+      "\u24d8"
     )
   )
 }
@@ -495,6 +500,22 @@ body.sqm-no-project [data-value='Multivariate'] { display: none !important; }
 .launcher-status-error    { background-color: #c0392b        !important; }
 .launcher-status-aborted  { background-color: #d68910        !important; }
 "
+# Initialise Bootstrap 5 tooltips whenever the DOM changes (Shiny re-renders)
+tooltip_init_js <- HTML("
+  $(document).ready(function() {
+    function initTooltips() {
+      var els = document.querySelectorAll('[data-bs-toggle=tooltip]');
+      els.forEach(function(el) {
+        if (!bootstrap.Tooltip.getInstance(el))
+          new bootstrap.Tooltip(el, { trigger: 'hover', boundary: 'window' });
+      });
+    }
+    initTooltips();
+    // Re-init after any Shiny output re-renders
+    $(document).on('shiny:value', function() { setTimeout(initTooltips, 100); });
+  });
+")
+
 build_func_pattern <- function(search_text) {
   search_text <- trimws(search_text)
   if (nchar(search_text) == 0) return(NULL)

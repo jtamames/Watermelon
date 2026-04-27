@@ -11,7 +11,8 @@ ui <- page_navbar(
   header = tagList(
     useShinyjs(),
     tags$head(tags$style(HTML(custom_css))),
-    tags$script(HTML("document.body.classList.add('sqm-no-project');"))
+    tags$script(HTML("document.body.classList.add('sqm-no-project');")),
+    tags$script(tooltip_init_js)
   ),
   # ── Run ─────────────────────────────────────────────────────────────────
   nav_panel(
@@ -155,7 +156,8 @@ nav_panel("Load",
     layout_sidebar(fillable = FALSE,
       sidebar = sidebar(width = 300, open = TRUE,
         tags$div(class = "sidebar-box",
-          tags$div(class = "form-label", "Load mode"),
+          help_label("Load mode",
+            "Load project: loads data from a SqueezeMeta project directory (expects tables in results/tables).\nLoad tables: loads data from an already-created tables directory.\nLoad multiple: loads and combines data from multiple project or tables directories (e.g. sequential mode runs)."),
           radioButtons("load_mode", NULL,
             choices  = c("Load project" = "project", "Load tables" = "tables",
                          "Load multiple" = "multiple"),
