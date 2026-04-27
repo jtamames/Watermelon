@@ -168,7 +168,7 @@ nav_panel("Load",
         actionButton("load_project", "Load", class = "btn-primary w-100 mb-2"),
         uiOutput("project_status_ui")
       ),
-      tags$div(style = "padding: 1rem;", uiOutput("project_summary_ui"))
+      tags$div(style = "padding: 1rem; overflow-x: auto;", uiOutput("project_summary_ui"))
     )
   ),
   nav_panel("Plots",
