@@ -377,6 +377,63 @@ nav_panel("Load",
       )
     )
   ),
+  nav_panel("Comparison",
+    layout_sidebar(
+      sidebar = sidebar(width = 290,
+
+        tags$div(class = "sidebar-box",
+          help_label("Category", "Choose between taxonomy or functional annotation."),
+          uiOutput("cmp_category_ui")
+        ),
+
+        tags$div(class = "sidebar-box",
+          uiOutput("cmp_sub_ui")
+        ),
+
+        tags$div(class = "sidebar-box",
+          help_label("Method",
+            "Wilcoxon: non-parametric rank test, no distributional assumptions.\nDESeq2: negative binomial GLM, recommended for count data.\nedgeR: negative binomial GLM, suitable for small sample sizes."),
+          selectInput("cmp_method", NULL,
+            choices  = c("Wilcoxon" = "wilcoxon", "DESeq2" = "deseq2", "edgeR" = "edger"),
+            selected = "wilcoxon")
+        ),
+
+        tags$div(class = "sidebar-box",
+          help_label("Groups",
+            "Select samples for each group. Checking a sample in one group removes it from the other."),
+          uiOutput("cmp_group_ui")
+        ),
+
+        tags$div(class = "sidebar-box",
+          help_label("Filters", "FDR threshold and minimum absolute fold-change."),
+          tags$div(style = "display:flex; gap:8px;",
+            tags$div(style = "flex:1;",
+              tags$div(class = "form-label", "FDR ≤"),
+              numericInput("cmp_fdr", NULL, value = 0.05, min = 0, max = 1, step = 0.01, width = "100%")),
+            tags$div(style = "flex:1;",
+              tags$div(class = "form-label", "Min |log2FC|"),
+              numericInput("cmp_lfc", NULL, value = 1, min = 0, step = 0.1, width = "100%"))
+          )
+        ),
+
+        tags$hr(class = "section-divider"),
+        actionButton("do_cmp", "Run comparison", class = "btn-primary w-100"),
+        tags$div(style = "margin-top:8px;", uiOutput("cmp_status_ui")),
+        tags$div(style = "margin-top:8px;", uiOutput("cmp_download_ui"))
+      ),
+
+      card(
+        card_header(
+          div(style = "display:flex; justify-content:space-between; align-items:center;",
+            uiOutput("cmp_card_title_ui"),
+            uiOutput("cmp_badge_ui"))
+        ),
+        card_body(class = "p-2",
+          uiOutput("cmp_main_ui")
+        )
+      )
+    )
+  ),
   nav_panel("About",
     tags$div(style = "max-width:760px; margin: 2rem auto; padding: 0 1rem;",
 

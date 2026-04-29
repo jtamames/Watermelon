@@ -1,16 +1,18 @@
 # Watermelon
 
-Interactive Shiny dashboard for running, visualizing and exploring [SqueezeMeta](https://github.com/jtamames/SqueezeMeta) metagenomics results.
+Interactive Shiny dashboard for running, visualising and exploring [SqueezeMeta](https://github.com/jtamames/SqueezeMeta) metagenomics results.
 
 ## Features
 
 - **Run** — launch SqueezeMeta, sqm_reads or sqm_longreads pipelines directly from the browser, monitor progress in real time, and automatically load results when the run finishes
-- **Load** — loads SQM (full) and SQMlite projects, displays a structured summary including reads, contigs, ORFs, taxonomy coverage and most abundant taxa
+- **Load** — loads SQM (full) and SQMlite projects (single or multiple combined with `combineSQM`), displays a structured summary
 - **Plots** — interactive barplots and heatmaps for taxonomy (all ranks) and functions (COG, KEGG, PFAM, external DBs), with search, count type selection, rescaling options, and adjustable size/font; bins barplot
-- **Tables** — browsable, downloadable tables for assembly (contigs, ORFs), taxonomy (all ranks), functions (COG, KEGG, PFAM, external DBs) and bins; multiple metrics; COG and KEGG tables include Name and Path annotation columns
-- **Krona** — generates and displays interactive Krona taxonomy charts inline, with per-sample filtering and HTML download
-- **Pathways** — overlays functional abundance data onto KEGG pathway maps using `exportPathway` from SQMtools; supports per-sample coloring, log scale, fold-change between sample groups, and hierarchical pathway browser with search
-- **Multivariate** — ordination analysis (PCA and NMDS) on taxonomy or functional abundance data, with multiple normalization and distance options, quality warnings, and interactive biplot
+- **Tables** — browsable, downloadable tables for assembly (contigs, ORFs), taxonomy (all ranks), functions (COG, KEGG, PFAM, external DBs) and bins
+- **Krona** — generates and displays interactive Krona taxonomy charts inline
+- **Pathways** — overlays functional abundance data onto KEGG pathway maps
+- **Multivariate** — ordination analysis (PCA and NMDS)
+- **Comparison** — differential abundance analysis between sample groups using Wilcoxon, DESeq2 or edgeR, with volcano plots and results tables
+- **About** — citation information and links
 
 ---
 
@@ -19,8 +21,8 @@ Interactive Shiny dashboard for running, visualizing and exploring [SqueezeMeta]
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/jtamames/watermelon.git
-cd watermelon
+git clone https://github.com/jtamames/Watermelon.git
+cd Watermelon
 ```
 
 ### 2. Install R dependencies
@@ -49,32 +51,21 @@ Listening on http://127.0.0.1:6186
 
 Open that URL in your browser. The port number may vary each time.
 
-To use a fixed port or make the app accessible from another machine on the network:
+To use a fixed port or make the app accessible from another machine:
 
 ```bash
 Rscript -e 'shiny::runApp("app.R", host="0.0.0.0", port=3838, launch.browser=FALSE)'
 ```
 
-Then open `http://<server-ip>:3838` in your local browser.
-
-> **Important:** the SqueezeMeta conda environment must be active before launching the app, both for the visualisation features and for the Run tab to be able to find `SqueezeMeta.pl` and related scripts in the PATH.
+> **Important:** the SqueezeMeta conda environment must be active before launching the app, both for the visualisation features and for the Run tab to find `SqueezeMeta.pl` in the PATH.
 
 ---
 
 ## KronaTools (optional, required for Krona tab)
 
-If SqueezeMeta is already installed in your environment, KronaTools is likely already available — check before installing:
-
 ```bash
-which ktImportText
-```
-
-If it prints a path, no further action is needed. Watermelon detects it automatically.
-
-If it is not available, install it via conda:
-
-```bash
-conda install -c bioconda krona
+which ktImportText  # if prints a path, already available
+conda install -c bioconda krona  # if not available
 ktUpdateTaxonomy.sh
 ```
 
@@ -84,69 +75,53 @@ ktUpdateTaxonomy.sh
 
 ### Run tab — launching a pipeline
 
-The **Run** tab lets you configure and launch a SqueezeMeta pipeline without leaving the browser.
-
-#### Configuring a run
-
-**Project Setup**
-
-- **Project name** — name for the output directory that will be created inside the working directory.
-- **Program** — choose between `SqueezeMeta` (Illumina / short reads), `sqm_reads` (read-level, no assembly) or `sqm_longreads` (Oxford Nanopore long reads).
-- **Execution mode** — (SqueezeMeta only) `coassembly`, `sequential`, `merged` or `seqmerge`.
+**Project Setup** — project name, program (SqueezeMeta / sqm_reads / sqm_longreads), execution mode.
 
 **Input Files**
 
-- **Samples file (-s)** — the samples file listing your FASTQ files and their metadata.
-- **Input directory (-f)** — directory containing the FASTQ files.
-- **Working directory** — directory where the project folder will be created.
+- **Samples file (-s)** — click **Create** to open a wizard: select a FASTQ directory, assign sample names and pair1/pair2 per file (auto-guessed from `_R1`/`_R2` suffixes), choose a save location, and click Save. The file path and input directory are auto-populated in the sidebar.
+- **Input directory (-f)** — auto-populated when using the samples file creator.
+- **Working directory** — where the project folder will be created.
 
-**Profile** (SqueezeMeta only)
+**Profile** — *Standard Metagenome* (Illumina) or *Nanopore Metagenome* (ONT).
 
-Pre-defined parameter sets for common use cases:
+**Advanced** — Filtering, Assembly, Annotation, Mapping, Binning, Performance.
 
-- *Standard Metagenome* — default settings for Illumina short-read data (megahit assembler, bowtie mapper).
-- *Nanopore Metagenome* — optimised for ONT long reads (canu assembler, minimap2-ont mapper, adjusted consensus parameters).
+**Monitoring** — the current pipeline step (e.g. `STEP4 -> HOMOLOGY SEARCHES`) is shown above the log. Click **■ Abort** to stop.
 
-Loading a profile overwrites the current advanced settings. You can then fine-tune individual parameters manually.
-
-**Advanced settings**
-
-- **Filtering** — optionally run Trimmomatic quality trimming before assembly, with configurable parameters.
-- **Assembly** — assembler (`megahit`, `spades`, `rnaspades`, `canu`, `flye`), assembly options, minimum contig length, singletons.
-- **Annotation** — disable individual annotation databases (COG, KEGG, PFAM); enable eukaryote mode or double-pass diamond; add external databases.
-- **Mapping** — mapper (`bowtie`, `bwa`, `minimap2-ont`, `minimap2-pb`, `minimap2-sr`) and extra mapping options.
-- **Binning** — skip binning, run only binning, or choose which binners to use (Concoct, Metabat2, MaxBin).
-- **Performance** — number of threads.
-
-#### Starting and monitoring the run
-
-Click **▶ Run** to start the pipeline. The execution log streams output in real time. The current pipeline step (e.g. `STEP4 -> HOMOLOGY SEARCHES`) is displayed in large text above the log so you can follow progress at a glance.
-
-Click **■ Abort** to stop the pipeline at any point (a confirmation dialog will appear).
-
-#### Automatic loading of results
-
-When the pipeline finishes successfully, Watermelon automatically:
-
-1. Runs `sqm2tables.py` (or `sqmreads2tables.py` for sqm_reads / sqm_longreads) to generate the SQMlite tables, streaming its output to the log.
-2. Loads the project with `loadSQM` or `loadSQMlite` from SQMtools.
-3. Reveals the analysis tabs (Plots, Tables, Krona, Pathways, Multivariate) and switches to the **Load** tab to show the project summary.
-
-If the tables directory already exists from a previous run, step 1 is skipped.
+**Auto-loading** — when the pipeline finishes, Watermelon automatically runs `sqm2tables.py` (or `sqmreads2tables.py`), loads the project, and switches to the Load tab.
 
 ---
 
 ### Load tab — loading an existing project
 
-1. Go to the **Load** tab.
-2. Choose load mode: **Load project** (for a SqueezeMeta project directory) or **Load tables** (for a directory of SQMlite tables).
-3. Click **Select directory** and choose the appropriate directory.
-4. The app auto-detects the project type from `creator.txt`:
-   - **SqueezeMeta projects** (`SqueezeMeta.pl`): point to the project root directory.
-   - **SQMlite projects** (`sqm2tables.py`, `sqmreads2tables.py`, `combine-sqm-tables.py`): point to the tables directory.
-5. Click **Load**.
+Three modes (hover the ⓘ icon for details):
 
-If the tables directory cannot be detected automatically, a manual directory selector will appear.
+- **Load project** — SqueezeMeta project directory.
+- **Load tables** — directory of pre-generated SQMlite tables.
+- **Load multiple** — add directories one by one; combined with `combineSQM()`. Requires at least 2 directories.
+
+---
+
+### Comparison tab — differential abundance analysis
+
+**Data** — taxonomy (by rank: superkingdom → species) or functional databases (COG, KEGG, PFAM...).
+
+**Method:**
+
+| Method | Notes | Min replicates |
+|--------|-------|----------------|
+| Wilcoxon | Non-parametric, no distributional assumptions | 2 per group |
+| DESeq2 | Negative binomial GLM, recommended for count data | 2 per group |
+| edgeR | Negative binomial GLM, good for small n | 2 per group |
+
+DESeq2 and edgeR are blocked when any group has only 1 sample. A warning is shown when any group has fewer than 3 samples.
+
+**Groups** — two checkbox columns (Group 1 / Group 2). Checking a sample in one group removes it from the other automatically.
+
+**Filters** — FDR threshold and minimum |log2FC|.
+
+**Results** — interactive volcano plot + results table (feature, name for functional data, log2FC, p-value, FDR, mean group 1, mean group 2). Downloadable as TSV.
 
 ---
 
@@ -155,46 +130,7 @@ If the tables directory cannot be detected automatically, a manual directory sel
 | Type | Load function | Features |
 |------|--------------|----------|
 | SQM (full) | `loadSQM` | All tabs, all plots, taxonomy/function search, bins |
-| SQMlite | `loadSQMlite` | Plots, Tables, Krona, Pathways, Multivariate; no contig/ORF/bin detail |
-
----
-
-## Tabs
-
-### Plots
-
-Select a category (Taxonomy / Functions / MAGs) and then a plot type from the sidebar.
-
-**Taxonomy (barplot)** — stacked barplot of the most abundant taxa at the selected rank.
-
-- Choose rank (Phylum → Species), count type, and number of taxa.
-- Optionally search for specific taxa by name (SQM full only); comma-separated, empty means top N.
-- Filter options: Ignore unmapped, Ignore unclassified, Ignore ambiguous, Rescale to 100%.
-- Format controls (top bar): width, height, font size, colour palette, label width.
-
-**Taxonomy (heatmap)** — interactive heatmap of the most abundant taxa.
-
-**COG / KEGG / PFAM / external databases** — interactive heatmap of the most abundant functions, with search by ID or keyword, optional category filter, count type and rescale selectors.
-
-**MAGs** — barplot of bin abundances (SQM full only).
-
-All plots support a **sample selector** to restrict the analysis to a subset of samples.
-
-### Tables
-
-Four independent category selectors: Assembly (contigs, ORFs), Taxonomy (all ranks), Functions (COG, KEGG, PFAM, external DBs) and Bins. Use **Download CSV** to export the current view.
-
-### Krona
-
-Generates an interactive Krona taxonomy chart using `exportKrona` from SQMtools and `ktImportText` from KronaTools. Optionally filter by sample before generating. Displayed inline and downloadable as self-contained HTML.
-
-### Pathways
-
-Overlays KEGG functional abundance data onto pathway maps using `exportPathway` from SQMtools (wraps the `pathview` Bioconductor package). Requires an internet connection. Supports per-sample coloring, fold-change mode and log scale.
-
-### Multivariate
-
-Ordination analysis (PCA and NMDS) on taxonomy or functional abundance data, with multiple normalization and distance options and quality warnings.
+| SQMlite | `loadSQMlite` | Plots, Tables, Krona, Pathways, Multivariate, Comparison; no contig/ORF/bin detail |
 
 ---
 
@@ -209,56 +145,50 @@ Ordination analysis (PCA and NMDS) on taxonomy or functional abundance data, wit
 | DT | CRAN | Core |
 | SQMtools | CRAN / SqueezeMeta repo | Core |
 | processx | CRAN | Run tab |
-| plotly | CRAN | Plots tab |
+| plotly | CRAN | Plots, Comparison tabs |
 | vegan | CRAN | Multivariate tab |
 | xml2 | CRAN | Pathways tab |
 | pathview | Bioconductor | Pathways tab |
+| DESeq2 | Bioconductor | Comparison tab (optional) |
+| edgeR | Bioconductor | Comparison tab (optional) |
 | KronaTools (`ktImportText`) | conda / GitHub | Krona tab |
 
 ---
 
 ## Server deployment (remote access)
 
-This section explains how to make Watermelon accessible to remote users via **Shiny Server**, running permanently on a Linux machine.
-
 ### 1. Install R packages on the server
-
-All packages must be installed as root so Shiny Server can find them:
 
 ```bash
 sudo apt-get install -y cmake liblzma-dev
-sudo R -e "install.packages(c('shiny','shinyjs','shinyFiles','bslib','DT','plotly','SQMtools','vegan','xml2','processx'), repos='https://cran.rstudio.com/')"
+sudo R -e "install.packages(c('shiny','shinyjs','shinyFiles','bslib','DT','plotly',
+  'SQMtools','vegan','xml2','processx'), repos='https://cran.rstudio.com/')"
 sudo R -e 'install.packages("BiocManager", repos="https://cran.rstudio.com/")'
-sudo R -e 'BiocManager::install(c("pathview", "Biostrings", "DESeq2", "edgeR"))'
+sudo R -e 'BiocManager::install(c("pathview","Biostrings","DESeq2","edgeR"))'
 ```
 
-> **Note:** run these commands **outside** any conda environment so the system R is used. Run `conda deactivate` first and verify with `which R`.
+> Run outside any conda environment (`conda deactivate` first, verify with `which R`).
 
 ### 2. Install Shiny Server
 
 ```bash
-# Check https://posit.co/download/shiny-server/ for the latest version
 wget https://download3.rstudio.org/ubuntu-18.04/x86_64/shiny-server-1.5.21.1012-amd64.deb
 sudo dpkg -i shiny-server-1.5.21.1012-amd64.deb
 ```
 
-### 3. Deploy the app
+### 3. Deploy and configure
 
 ```bash
 sudo mkdir -p /srv/shiny-server/watermelon
-sudo cp -r /path/to/watermelon/* /srv/shiny-server/watermelon/
+sudo cp -r /path/to/Watermelon/* /srv/shiny-server/watermelon/
 ```
-
-### 4. Configure Shiny Server
 
 Edit `/etc/shiny-server/shiny-server.conf`:
 
 ```
 run_as shiny;
-
 server {
   listen 3838;
-
   location /watermelon {
     app_dir /srv/shiny-server/watermelon;
     log_dir /var/log/shiny-server;
@@ -266,144 +196,61 @@ server {
 }
 ```
 
-### 5. Grant data access to the shiny user
+### 4. Data access and startup
 
 ```bash
-# Option A: add shiny to the group that owns the data
-sudo usermod -aG your_data_group shiny
-
-# Option B: grant read access explicitly
 sudo chmod -R o+rX /path/to/your/sqm/projects
-```
-
-Also make sure the `shiny` user can traverse your home directory:
-
-```bash
 chmod o+x /home/your_username
-```
-
-> **Note on directory navigation:** the file browser shows two roots: `home` (maps to `/home/shiny`, typically empty) and `root` (maps to `/`). To reach your project data, choose **root** and navigate to the full path.
-
-> **Note on the Run tab in server mode:** when running under Shiny Server, the `shiny` user must have access to the SqueezeMeta conda environment and `SqueezeMeta.pl` must be in its PATH. Add the conda `bin` directory to `/etc/environment` or configure `run_as` to use a user with the environment active.
-
-### 6. Start and enable the service
-
-```bash
 sudo systemctl start shiny-server
 sudo systemctl enable shiny-server
-sudo systemctl status shiny-server
-```
-
-### 7. Open the firewall port
-
-```bash
 sudo ufw allow 3838/tcp
 ```
 
-### 8. Access the app
+Access at: `http://<server-ip>:3838/watermelon`
 
-```
-http://<server-ip>:3838/watermelon
-```
+> **Run tab in server mode:** the `shiny` user needs `SqueezeMeta.pl` in its PATH. Add the conda environment `bin` directory to `/etc/environment`.
 
-To find the server IP: `hostname -I`
+> **Directory navigation:** use **root** (maps to `/`) in the file browser to reach your data.
 
 ---
 
 ## Remote access from outside the local network
 
-### Option A: SSH tunnel
-
-The remote user runs this on their own machine:
-
+**SSH tunnel:**
 ```bash
 ssh -L 3838:localhost:3838 user@server-ip
+# open http://localhost:3838/watermelon
 ```
 
-Then opens `http://localhost:3838/watermelon` in their browser.
-
-### Option B: nginx reverse proxy with HTTPS
-
-```bash
-sudo apt-get install -y nginx certbot python3-certbot-nginx
-```
-
-Create `/etc/nginx/sites-available/watermelon`:
-
-```nginx
-server {
-    listen 80;
-    server_name watermelon.yourdomain.org;
-
-    location /watermelon/ {
-        proxy_pass http://localhost:3838/watermelon/;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_read_timeout 3600;
-    }
-}
-```
-
-```bash
-sudo ln -s /etc/nginx/sites-available/watermelon /etc/nginx/sites-enabled/
-sudo systemctl restart nginx
-sudo certbot --nginx -d watermelon.yourdomain.org
-```
-
-### Option C: ngrok (quick demo)
-
-```bash
-ngrok http 3838
-```
+**nginx reverse proxy** — see full example in the project wiki.
 
 ---
 
 ## Troubleshooting
 
-**App does not load / blank page**
-```bash
-tail -f /var/log/shiny-server/*.log
-```
-
-**Missing R packages** — the log will show `Error in library(...)`. Install as root (see step 1).
-
 **`SqueezeMeta.pl` not found (Run tab)**
-
-Verify the conda environment is active and the executable is on the PATH:
-```r
-Sys.which("SqueezeMeta.pl")   # should return a path, not ""
-Sys.getenv("PATH")            # should include the conda env bin directory
-```
-Always launch the app from inside an active conda environment:
 ```bash
 conda activate SqueezeMeta
 Rscript -e 'shiny::runApp("app.R", launch.browser=FALSE)'
 ```
 
-**`processx` error on run start** — make sure `processx` is installed:
+**`processx` error**
 ```bash
 conda activate SqueezeMeta
 R -e "install.packages('processx', repos='https://cran.rstudio.com/')"
 ```
 
-**shiny user cannot read project files**
+**DESeq2 / edgeR not available**
 ```bash
-sudo chmod -R o+rX /path/to/sqm/project
+conda activate SqueezeMeta
+R -e "BiocManager::install(c('DESeq2','edgeR'))"
 ```
 
-**Port 3838 not reachable**
-```bash
-sudo ufw status
-sudo ufw allow 3838/tcp
-ss -tlnp | grep 3838
-```
+**Cannot find results tables** — the error message shows the path that was tried. For SQMlite projects, point to the directory containing the `.tsv` files, not the parent project directory.
 
-**KronaTools not found by shiny user**
+**App does not load**
 ```bash
-sudo -u shiny which ktImportText
-# If not found, add KronaTools bin to /etc/environment
+tail -f /var/log/shiny-server/*.log
 ```
 
 ---
@@ -420,3 +267,5 @@ If you use SqueezeMeta or SQMtools in your research, please cite:
 ## License
 
 MIT
+
+© Javier Tamames, CNB-CSIC (Madrid, Spain) 2026

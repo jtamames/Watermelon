@@ -73,7 +73,7 @@ fi
 echo ""
 
 # ── 2. R packages (CRAN) ───────────────────────
-echo "[2/3] Installing R packages from CRAN..."
+echo "[2/3] Installing R packages from CRAN (including processx for Run tab)..."
 Rscript -e "
   repos <- 'https://cran.rstudio.com/'
   pkgs <- c('shiny', 'shinyjs', 'shinyFiles', 'bslib', 'DT', 'plotly',
@@ -93,12 +93,12 @@ echo "  ✓ CRAN packages installed"
 echo ""
 
 # ── 3. R packages (Bioconductor) ──────────────
-echo "[3/3] Installing Bioconductor packages (pathview, Biostrings)..."
+echo "[3/3] Installing Bioconductor packages (pathview, Biostrings, DESeq2, edgeR)..."
 Rscript -e "
   if (!requireNamespace('BiocManager', quietly=TRUE))
     install.packages('BiocManager', repos='https://cran.rstudio.com/')
   BiocManager::install(ask = FALSE, update = FALSE)
-  pkgs <- c('pathview', 'Biostrings')
+  pkgs <- c('pathview', 'Biostrings', 'DESeq2', 'edgeR')
   missing <- pkgs[!sapply(pkgs, requireNamespace, quietly = TRUE)]
   if (length(missing) > 0) {
     cat('  Installing:', paste(missing, collapse=', '), '\n')

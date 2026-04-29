@@ -213,7 +213,7 @@ body { background: var(--bg); color: var(--text); }
   padding-left: 0 !important;
   margin-left: 0 !important;
 }
-.nav-link { color: rgba(26,42,58,0.55) !important; font-size: 1.2rem; padding: 0.6rem 0.9rem !important; }
+.nav-link { color: rgba(26,42,58,0.55) !important; font-size: 1.0rem; padding: 0.5rem 0.75rem !important; }
 .nav-link:hover { color: #1a6eb5 !important; }
 .nav-link.active { color: #1a6eb5 !important; border-bottom: 2px solid #1a6eb5; font-weight: 500; }
 .card {
@@ -458,13 +458,26 @@ table.dataTable tbody tr:hover { background: #eef5fc !important; }
 
 
 
+/* Comparison tab: pull DT pagination up next to the Shiny length selector */
+#cmp_main_ui .dataTables_wrapper .dataTables_paginate {
+  float: right;
+  margin-top: -46px;
+  position: relative;
+  z-index: 1;
+}
+#cmp_main_ui .dataTables_wrapper .dataTables_info {
+  clear: both;
+  padding-top: 4px;
+}
+
 /* Hide analysis tabs until project loads (body.sqm-no-project is set by default,
    removed by the server once a project is ready) */
 body.sqm-no-project [data-value='Plots'],
 body.sqm-no-project [data-value='Tables'],
 body.sqm-no-project [data-value='Krona'],
 body.sqm-no-project [data-value='Pathways'],
-body.sqm-no-project [data-value='Multivariate'] { display: none !important; }
+body.sqm-no-project [data-value='Multivariate'],
+body.sqm-no-project [data-value='Comparison'] { display: none !important; }
 
 /* ── Launcher tab ──────────────────────────────────────────────── */
 #launcher-log-container {
