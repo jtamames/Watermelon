@@ -400,7 +400,7 @@ nav_panel("Load",
 
         tags$div(class = "sidebar-box",
           help_label("Groups",
-            "Select samples for each group. Checking a sample in one group removes it from the other."),
+            "Select samples for each group. Checking a sample in one group automatically removes it from the other."),
           uiOutput("cmp_group_ui")
         ),
 
@@ -414,6 +414,10 @@ nav_panel("Load",
               tags$div(class = "form-label", "Min |log2FC|"),
               numericInput("cmp_lfc", NULL, value = 1, min = 0, step = 0.1, width = "100%"))
           )
+        ,
+          tags$hr(style = "margin:8px 0;"),
+          checkboxInput("cmp_excl_unclassified", "Exclude Unmapped / Unclassified", value = TRUE),
+          checkboxInput("cmp_excl_ambiguous",    "Exclude ambiguous taxa", value = FALSE)
         ),
 
         tags$hr(class = "section-divider"),

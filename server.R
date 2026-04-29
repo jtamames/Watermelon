@@ -3748,8 +3748,6 @@ server <- function(input, output, session) {
     def1 <- samples[seq_len(half)]
     def2 <- samples[(half + 1):n]
     tagList(
-      tags$div(style = "font-size:0.78rem; color:var(--muted); margin-bottom:8px;",
-        "Select samples for each group. A sample can only belong to one group."),
       tags$div(style = "display:flex; gap:10px;",
         tags$div(style = "flex:1;",
           tags$div(class = "form-label", "Group 1"),
@@ -3903,6 +3901,17 @@ server <- function(input, output, session) {
       }
     }, error = function(e) NULL)
 
+    # Apply exclusion filters (same as Multivariate tab)
+    # Always exclude "No CDS"
+    mat <- mat[!grepl("^No CDS$", rownames(mat), ignore.case = TRUE), , drop = FALSE]
+    if (isTRUE(input$cmp_excl_unclassified)) {
+      excl_pat <- c("Unclassified", "Unmapped", "No database", "")
+      mat <- mat[!rownames(mat) %in% excl_pat, , drop = FALSE]
+    }
+    if (isTRUE(input$cmp_excl_ambiguous)) {
+      mat <- mat[!grepl("^unclassified", rownames(mat), ignore.case = TRUE), , drop = FALSE]
+    }
+
     if (is.null(mat) || nrow(mat) == 0) {
       cmp_status("error")
       # Diagnostic: show actual structure
@@ -4053,17 +4062,44 @@ server <- function(input, output, session) {
                       selected = pair, width = "100%")),
 
       # Volcano plot
-      tags$div(class = "form-label", style = "margin-bottom:4px;", "Volcano plot"),
+      tags$div(style = "display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;",
+        tags$div(class = "form-label", style = "margin:0;", "Volcano plot"),
+        tags$button(
+          class = "btn btn-outline-secondary btn-sm",
+          style = "font-size:0.78rem;",
+          onclick = paste0(
+            "var gd = document.querySelector('#cmp_main_ui .js-plotly-plot');",
+            "if (!gd || !gd._fullLayout) { alert('Plot not ready'); return; }",
+            "Plotly.toImage(gd, {format:'png', width:gd._fullLayout.width,",
+            " height:gd._fullLayout.height, scale:2}).then(function(url){",
+            "  var a = document.createElement('a');",
+            "  a.href = url; a.download = 'volcano_plot.png'; a.click();",
+            "});"
+          ),
+          "💾 Download PNG"
+        )
+      ),
       plotly::renderPlotly({
         df2 <- df[!is.na(df$padj), ]
         df2$col <- ifelse(df2$padj <= fdr & df2$log2FC >= lfc,  "Up",
                    ifelse(df2$padj <= fdr & df2$log2FC <= -lfc, "Down", "NS"))
         df2$col <- factor(df2$col, levels = c("Up","Down","NS"))
         cols <- c(Up = "#e74c3c", Down = "#2980b9", NS = "#bdc3c7")
+        # Build hover text: "feature\nGroup1: val1  Group2: val2"
+        pair_name <- input$cmp_pair %||% names(res)[1]
+        grp_labels <- strsplit(pair_name, " vs ")[[1]]
+        g1_label <- if (length(grp_labels) >= 1) grp_labels[1] else "Group1"
+        g2_label <- if (length(grp_labels) >= 2) grp_labels[2] else "Group2"
+        df2$hover_txt <- paste0(
+          df2$feature, "<br>",
+          g1_label, ": ", round(df2$mean_g1, 4), "<br>",
+          g2_label, ": ", round(df2$mean_g2, 4)
+        )
         p <- plotly::plot_ly(df2, x = ~log2FC, y = ~-log10(padj + 1e-300),
           color = ~col, colors = cols,
           type = "scatter", mode = "markers",
-          text = ~feature, hoverinfo = "text+x+y",
+          text = ~hover_txt,
+          hovertemplate = "%{text}<br>log2FC: %{x:.3f}<br>-log10(FDR): %{y:.2f}<extra></extra>",
           marker = list(size = 6, opacity = 0.75)) |>
         plotly::layout(
           xaxis = list(title = "log2 Fold Change", zeroline = TRUE),
