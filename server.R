@@ -150,7 +150,13 @@ server <- function(input, output, session) {
       tags$div(class = "sidebar-box",
         tags$div(class = "form-label", "Rank"),
         selectInput("tbl_taxonomy", NULL, choices = ch),
-        tags$div(class = "form-label", style = "margin-top:4px;", "Metric"),
+        help_label("Metric", paste0(
+          "Raw abundances (abund): number of reads/features assigned. Not normalized.\n\n",
+          "Percentages (percent): relative abundance as fraction of total. Removes sequencing depth bias.\n\n",
+          "Base counts (bases): total bases assigned. Proportional to abundance and feature length.\n\n",
+          "TPM: normalized by feature length and depth. Suitable for comparing expression levels.\n\n",
+          "Copy number: estimated copies per cell equivalent. Useful for functional gene comparison."
+        ), style = "margin-top:4px;"),
         selectInput("tbl_tax_metric", NULL, choices = metrics,
           selected = if (length(metrics) == 0) NULL else if ("percent" %in% metrics) "percent" else metrics[[1]]),
         entries_selector)
@@ -163,7 +169,13 @@ server <- function(input, output, session) {
       tags$div(class = "sidebar-box",
         tags$div(class = "form-label", "Database"),
         selectInput("tbl_functions", NULL, choices = ch),
-        tags$div(class = "form-label", style = "margin-top:4px;", "Metric"),
+        help_label("Metric", paste0(
+          "Raw abundances (abund): number of reads/features assigned. Not normalized.\n\n",
+          "Percentages (percent): relative abundance as fraction of total. Removes sequencing depth bias.\n\n",
+          "Base counts (bases): total bases assigned. Proportional to abundance and feature length.\n\n",
+          "TPM: normalized by feature length and depth. Suitable for comparing expression levels.\n\n",
+          "Copy number: estimated copies per cell equivalent. Useful for functional gene comparison."
+        ), style = "margin-top:4px;"),
         selectInput("tbl_fun_metric", NULL, choices = metrics,
           selected = if (length(metrics) == 0) NULL else if ("abund" %in% metrics) "abund" else metrics[[1]]),
         entries_selector)
@@ -220,6 +232,14 @@ server <- function(input, output, session) {
            if (length(metrics) == 0) NULL else if ("abund" %in% metrics) "abund" else metrics[[1]]
     updateSelectInput(session, "tbl_fun_metric", choices = metrics, selected = sel)
     do_load_table(input$tbl_functions)
+  })
+  observeEvent(input$tbl_tax_metric, ignoreNULL=TRUE, ignoreInit=TRUE, {
+    tt <- isolate(active_tbl_rv())
+    if (!is.null(tt) && startsWith(tt, "tax_")) do_load_table(tt)
+  })
+  observeEvent(input$tbl_fun_metric, ignoreNULL=TRUE, ignoreInit=TRUE, {
+    tt <- isolate(active_tbl_rv())
+    if (!is.null(tt) && startsWith(tt, "fun_")) do_load_table(tt)
   })
   observeEvent(input$tbl_page_length, ignoreNULL=TRUE, ignoreInit=TRUE, {
     tt <- isolate(active_tbl_rv())
