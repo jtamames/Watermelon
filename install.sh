@@ -34,50 +34,34 @@ R_VERSION=$(Rscript -e 'cat(as.character(getRversion()))')
 echo "R version: $R_VERSION"
 echo ""
 
-# ── 1. System libraries ────────────────────────
-if command -v apt-get &> /dev/null; then
-  echo "[1/3] Installing system libraries..."
-  sudo apt-get install -y \
-    cmake zip \
-    libcurl4-openssl-dev libssl-dev libxml2-dev \
-    libfontconfig1-dev libharfbuzz-dev libfribidi-dev \
-    libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev \
-    liblzma-dev 2>/dev/null \
-    || echo "  (skipped — no sudo access)"
-  echo "  ✓ System libraries done"
+# ── 1. System libraries via conda/mamba (no sudo required) ────────────────
+echo "[1/3] Installing system libraries..."
+# Use mamba if available (much faster than conda), fall back to conda
+if command -v mamba &> /dev/null; then
+  CONDA_CMD="mamba"
+  echo "  Using mamba for fast installation"
 else
-  echo "[1/3] Skipping system libraries (apt-get not available)"
+  CONDA_CMD="conda"
+  echo "  mamba not found, using conda (this may take a while)"
 fi
-
-# Make cmake visible without overriding conda's R
-# Find cmake location and add only that directory
-CMAKE_DIR=$(dirname "$(which cmake 2>/dev/null || find /usr -name cmake -type f 2>/dev/null | head -1)")
-if [ -n "$CMAKE_DIR" ] && [ "$CMAKE_DIR" != "." ]; then
-  export PATH="$PATH:$CMAKE_DIR"
-fi
-
-# Fix liblzma: conda's cross-compiler looks for it inside the conda env
-# but it's only available system-wide — create a symlink if missing
-if [ ! -f "$CONDA_PREFIX/lib/liblzma.so" ]; then
-  LZMA_SYS=$(find /usr/lib -name "liblzma.so*" 2>/dev/null | head -1)
-  if [ -n "$LZMA_SYS" ]; then
-    ln -sf "$LZMA_SYS" "$CONDA_PREFIX/lib/liblzma.so" 2>/dev/null || true
-  fi
-fi
-if [ ! -f "$CONDA_PREFIX/lib/liblzma.a" ]; then
-  LZMA_A=$(find /usr/lib -name "liblzma.a" 2>/dev/null | head -1)
-  if [ -n "$LZMA_A" ]; then
-    ln -sf "$LZMA_A" "$CONDA_PREFIX/lib/liblzma.a" 2>/dev/null || true
-  fi
-fi
+# All required libraries are available in conda-forge — no sudo needed.
+# R will find them automatically inside the active conda environment.
+$CONDA_CMD install -y -c conda-forge \
+  cmake zip \
+  libcurl openssl libxml2 \
+  fontconfig harfbuzz fribidi \
+  freetype libpng libtiff libjpeg-turbo \
+  xz-tools 2>/dev/null \
+  || echo "  (some packages may already be installed — continuing)"
+echo "  ✓ System libraries done"
 echo ""
 
 # ── 2. R packages (CRAN) ───────────────────────
-echo "[2/3] Installing R packages from CRAN (including processx for Run tab)..."
+echo "[2/3] Installing R packages from CRAN..."
 Rscript -e "
   repos <- 'https://cran.rstudio.com/'
   pkgs <- c('shiny', 'shinyjs', 'shinyFiles', 'bslib', 'DT', 'plotly',
-            'SQMtools', 'vegan', 'ggplot2', 'htmlwidgets', 'xml2', 'processx')
+            'SQMtools', 'vegan', 'ggplot2', 'htmlwidgets', 'xml2')
   missing <- pkgs[!sapply(pkgs, requireNamespace, quietly = TRUE)]
   if (length(missing) > 0) {
     cat('  Installing:', paste(missing, collapse=', '), '\n')
