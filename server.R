@@ -4101,17 +4101,30 @@ server <- function(input, output, session) {
       ),
       plotly::renderPlotly({
         df2 <- df[!is.na(df$padj), ]
-        df2$col <- ifelse(df2$padj <= fdr & df2$log2FC >= lfc,  "Up",
-                   ifelse(df2$padj <= fdr & df2$log2FC <= -lfc, "Down", "NS"))
-        df2$col <- factor(df2$col, levels = c("Up","Down","NS"))
-        cols <- c(Up = "#e74c3c", Down = "#2980b9", NS = "#bdc3c7")
-        # Build hover text: "feature\nGroup1: val1  Group2: val2"
         pair_name <- input$cmp_pair %||% names(res)[1]
         grp_labels <- strsplit(pair_name, " vs ")[[1]]
         g1_label <- if (length(grp_labels) >= 1) grp_labels[1] else "Group1"
         g2_label <- if (length(grp_labels) >= 2) grp_labels[2] else "Group2"
+        df2$col <- ifelse(df2$padj <= fdr & df2$log2FC >= lfc,  g2_label,
+                   ifelse(df2$padj <= fdr & df2$log2FC <= -lfc, g1_label, "NS"))
+        df2$col <- factor(df2$col, levels = c(g1_label, g2_label, "NS"))
+        cols <- setNames(c("#2980b9", "#e74c3c", "#bdc3c7"), c(g1_label, g2_label, "NS"))
+        # Build hover text: "feature\nGroup1: val1  Group2: val2"
+        # Look up feature description for hover
+        cat_hover <- isolate(input$cmp_category) %||% "taxonomy"
+        feat_names <- if (cat_hover == "functions") {
+          db_hover  <- isolate(input$cmp_func_db) %||% ""
+          nv <- tryCatch(sqm_data()$misc[[paste0(db_hover, "_names")]], error = function(e) NULL)
+          if (!is.null(nv)) nv[df2$feature] else rep("", nrow(df2))
+        } else {
+          rep("", nrow(df2))
+        }
+        feat_names[is.na(feat_names)] <- ""
+        feat_label <- ifelse(nzchar(feat_names),
+          paste0(df2$feature, ": ", feat_names),
+          df2$feature)
         df2$hover_txt <- paste0(
-          df2$feature, "<br>",
+          feat_label, "<br>",
           g1_label, ": ", round(df2$mean_g1, 4), "<br>",
           g2_label, ": ", round(df2$mean_g2, 4)
         )
@@ -4141,15 +4154,46 @@ server <- function(input, output, session) {
       }),
 
       # Results table (filtered)
-      tags$div(class = "form-label", style = "margin-top:12px;", "Significant features"),
-      tags$div(style = "display:flex; align-items:center; gap:6px; margin-bottom:2px;",
-        tags$span(style = "font-size:0.8rem; color:var(--muted);", "Show"),
-        selectInput("cmp_page_len", NULL, choices = c(10, 20, 50, 100), selected = 20, width = "75px"),
-        tags$span(style = "font-size:0.8rem; color:var(--muted);", "per page")
-      ),
+      local({
+        df_sig <- df[!is.na(df$padj) & df$padj <= fdr & abs(df$log2FC) >= lfc, ]
+        n_total <- nrow(df_sig)
+        n_up    <- sum(df_sig$log2FC > 0, na.rm = TRUE)
+        n_down  <- sum(df_sig$log2FC < 0, na.rm = TRUE)
+        pair_nm  <- input$cmp_pair %||% "Group1 vs Group2"
+        grp_lbls <- strsplit(pair_nm, " vs ")[[1]]
+        g1_lbl   <- if (length(grp_lbls) >= 1) grp_lbls[1] else "Group1"
+        g2_lbl   <- if (length(grp_lbls) >= 2) grp_lbls[2] else "Group2"
+        badge_style <- function(bg)
+          paste0("cursor:pointer; border:none; border-radius:4px; padding:3px 10px;",
+                 "font-size:0.8rem; font-weight:600; color:#fff; background:", bg, ";")
+        tagList(
+        tags$div(class = "form-label", style = "margin-bottom:4px;", "Significant features"),
+        tags$div(style = "display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;",
+          tags$div(style = "display:flex; align-items:center; gap:6px;",
+            tags$button(style = badge_style("#555"),
+              onclick = "Shiny.setInputValue('cmp_direction', 'all', {priority:'event'})",
+              paste0("All: ", n_total)),
+            tags$button(style = badge_style("#2980b9"),
+              onclick = "Shiny.setInputValue('cmp_direction', 'down', {priority:'event'})",
+              paste0(g1_lbl, ": ", n_down)),
+            tags$button(style = badge_style("#e74c3c"),
+              onclick = "Shiny.setInputValue('cmp_direction', 'up', {priority:'event'})",
+              paste0(g2_lbl, ": ", n_up))
+          ),
+          tags$div(style = "display:flex; align-items:center; gap:6px;",
+            tags$span(style = "font-size:0.8rem; color:var(--muted);", "Show"),
+            selectInput("cmp_page_len", NULL, choices = c(10, 20, 50, 100), selected = 20, width = "75px"),
+            tags$span(style = "font-size:0.8rem; color:var(--muted);", "per page")
+        )
+        )
+        )
+      }),
       DT::renderDT({
         n_rows <- as.integer(input$cmp_page_len %||% 20)
+        direction <- input$cmp_direction %||% "all"
         df2 <- df[!is.na(df$padj) & df$padj <= fdr & abs(df$log2FC) >= lfc, ]
+        if (direction == "up")   df2 <- df2[df2$log2FC > 0, , drop = FALSE]
+        if (direction == "down") df2 <- df2[df2$log2FC < 0, , drop = FALSE]
         df2 <- df2[order(df2$padj), ]
         df2$log2FC  <- round(df2$log2FC, 3)
         df2$pvalue  <- signif(df2$pvalue, 3)
@@ -4171,10 +4215,7 @@ server <- function(input, output, session) {
           df2 <- df2[, c("feature","log2FC","pvalue","padj","mean_g1","mean_g2"), drop = FALSE]
         }
         DT::datatable(df2, rownames = FALSE, filter = "none",
-          options = list(
-            pageLength = n_rows, scrollX = TRUE,
-            dom = "tip"
-          ))
+          options = list(pageLength = n_rows, scrollX = TRUE, dom = "tip"))
       })
     )
   })
