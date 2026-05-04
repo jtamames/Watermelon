@@ -373,10 +373,11 @@ nav_panel("Load",
 
         tags$div(class = "sidebar-box",
           help_label("Method",
-            "Wilcoxon: non-parametric rank test, no distributional assumptions.\nDESeq2: negative binomial GLM, recommended for count data.\nedgeR: negative binomial GLM, suitable for small sample sizes."),
+            "Wilcoxon: non-parametric rank test, no distributional assumptions. Works with any metric.\nDESeq2: negative binomial GLM for count data. Always uses raw counts internally.\nedgeR: negative binomial GLM for count data. Always uses raw counts internally."),
           selectInput("cmp_method", NULL,
             choices  = c("Wilcoxon" = "wilcoxon", "DESeq2" = "deseq2", "edgeR" = "edger"),
-            selected = "wilcoxon")
+            selected = "wilcoxon"),
+          uiOutput("cmp_metric_ui")
         ),
 
         tags$div(class = "sidebar-box",

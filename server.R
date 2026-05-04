@@ -3805,6 +3805,28 @@ server <- function(input, output, session) {
     }
   })
 
+  # ---- Metric selector (Wilcoxon only) ------------------------------------
+  output$cmp_metric_ui <- renderUI({
+    method <- input$cmp_method %||% "wilcoxon"
+    if (method != "wilcoxon") {
+      tags$div(style = "font-size:0.78rem; color:var(--muted); margin-top:6px;",
+        tags$em("DESeq2 and edgeR always use raw counts (abund). ",
+                "Normalisation is performed internally by each method."))
+    } else {
+      cat <- input$cmp_category %||% "taxonomy"
+      choices <- if (cat == "taxonomy")
+        c("Raw counts" = "abund", "Percentages" = "percent", "Base counts" = "bases")
+      else
+        c("Raw counts" = "abund", "TPM" = "tpm", "Copy number" = "copy_number", "Base counts" = "bases")
+      tagList(
+        help_label("Metric",
+          "Metric used for Wilcoxon test.\nRaw counts: not normalised for sequencing depth.\nPercentages: relative abundance, removes depth bias but compositional.\nTPM / Copy number: normalised, suitable for cross-sample comparison.",
+          style = "margin-top:6px;"),
+        selectInput("cmp_metric", NULL, choices = choices, selected = "percent", width = "100%")
+      )
+    }
+  })
+
   # ---- Group assignment UI -------------------------------------------------
   output$cmp_group_ui <- renderUI({
     proj <- sqm_data(); req(proj)
@@ -3932,38 +3954,37 @@ server <- function(input, output, session) {
     cmp_status("running"); cmp_results(NULL)
 
     # Extract the count matrix
+    # For DESeq2/edgeR always use raw counts; for Wilcoxon use selected metric
+    method_sel <- input$cmp_method %||% "wilcoxon"
+    metric_sel <- if (method_sel == "wilcoxon") (input$cmp_metric %||% "percent") else "abund"
+
     mat <- tryCatch({
       cat <- input$cmp_category %||% "taxonomy"
       if (cat == "taxonomy") {
         rank    <- input$cmp_tax_rank %||% "phylum"
         tax_obj <- proj$taxa[[rank]]
-        if (is.data.frame(tax_obj) || is.matrix(tax_obj)) {
-          as.matrix(tax_obj)
-        } else if (is.list(tax_obj)) {
-          m <- NULL
-          for (metric in c("abund", "percent", "bases")) {
-            candidate <- tax_obj[[metric]]
-            if (!is.null(candidate) && (is.data.frame(candidate) || is.matrix(candidate))) {
-              m <- as.matrix(candidate); break
-            }
+        # Try selected metric first, then fallback
+        m <- NULL
+        for (metric in c(metric_sel, "abund", "percent", "bases")) {
+          candidate <- if (is.list(tax_obj) && !is.data.frame(tax_obj)) tax_obj[[metric]]
+                       else if (metric == "abund") tax_obj else NULL
+          if (!is.null(candidate) && (is.data.frame(candidate) || is.matrix(candidate))) {
+            m <- as.matrix(candidate); break
           }
-          m
-        } else NULL
+        }
+        m
       } else {
         db      <- input$cmp_func_db %||% names(proj$functions)[1]
         fun_obj <- proj$functions[[db]]
-        if (is.data.frame(fun_obj) || is.matrix(fun_obj)) {
-          as.matrix(fun_obj)
-        } else if (is.list(fun_obj)) {
-          m <- NULL
-          for (metric in c("abund", "copy_number", "tpm", "bases")) {
-            candidate <- fun_obj[[metric]]
-            if (!is.null(candidate) && (is.data.frame(candidate) || is.matrix(candidate))) {
-              m <- as.matrix(candidate); break
-            }
+        m <- NULL
+        for (metric in c(metric_sel, "abund", "copy_number", "tpm", "bases")) {
+          candidate <- if (is.list(fun_obj) && !is.data.frame(fun_obj)) fun_obj[[metric]]
+                       else if (metric == "abund") fun_obj else NULL
+          if (!is.null(candidate) && (is.data.frame(candidate) || is.matrix(candidate))) {
+            m <- as.matrix(candidate); break
           }
-          m
-        } else NULL
+        }
+        m
       }
     }, error = function(e) NULL)
 
