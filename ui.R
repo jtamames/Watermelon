@@ -420,6 +420,39 @@ nav_panel("Load",
       )
     )
   ),
+  nav_panel("MAG Map",
+    layout_sidebar(
+      sidebar = sidebar(width = 290,
+        tags$div(class = "sidebar-box",
+          help_label("MAG", "Select a MAG to visualise its metabolic completeness on the diagram. Requires a full SQM project with KEGG annotation and binning."),
+          uiOutput("magmap_bin_select_ui")
+        ),
+        tags$hr(class = "section-divider"),
+        uiOutput("magmap_selected_ui"),
+        tags$hr(class = "section-divider"),
+        tags$div(class = "sidebar-box",
+          tags$div(class = "form-label", "Colour scale"),
+          tags$div(style = "display:flex; gap:8px; align-items:center;",
+            tags$div(style = "font-size:0.78rem; color:var(--muted);", "0%"),
+            tags$div(id = "magmap_gradient_bar",
+              style = "flex:1; height:12px; border-radius:4px; background: linear-gradient(to right, rgba(255,50,50,0.15), rgba(255,50,50,0.75));"),
+            tags$div(style = "font-size:0.78rem; color:var(--muted);", "100%")
+          ),
+          tags$div(style = "font-size:0.78rem; color:var(--muted); margin-top:4px;",
+            "Red overlay opacity = % KEGG completeness per category")
+        )
+      ),
+      card(
+        card_header(
+          help_label("Metabolic Map",
+            "The diagram shows major metabolic categories. Red overlays indicate the completeness of each category based on KEGG KOs present in the selected MAG. Hover for details.")
+        ),
+        card_body(class = "p-2",
+          uiOutput("magmap_view_ui")
+        )
+      )
+    )
+  ),
   nav_panel("About",
     tags$div(style = "max-width:760px; margin: 2rem auto; padding: 0 1rem;",
 

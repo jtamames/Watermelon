@@ -8,7 +8,7 @@ server <- function(input, output, session) {
   creator_name <- reactiveVal(NULL)
   is_sqm_full  <- reactiveVal(FALSE)
 
-  ANALYSIS_TABS <- c("Plots", "Tables", "Pathways", "Multivariate", "Comparison")
+  ANALYSIS_TABS <- c("Plots", "Tables", "Pathways", "Multivariate", "Comparison", "MAG Map")
 
 
   # ── Dynamic plot type selector ──
@@ -4302,6 +4302,237 @@ server <- function(input, output, session) {
       write.table(do.call(rbind, dfs), file, sep = "\t", row.names = FALSE, quote = FALSE)
     }
   )
+
+
+  # ===========================================================================
+  # MAG MAP TAB — metabolic completeness diagram with interactive overlays
+  # ===========================================================================
+
+  # ---- Helper: extract KOs for a bin --------------------------------------
+  get_bin_kos <- function(proj, bin_name) {
+    orf_tbl <- tryCatch(proj$orfs$table,    error = function(e) NULL)
+    ctg_tbl <- tryCatch(proj$contigs$table, error = function(e) NULL)
+    if (is.null(orf_tbl) || is.null(ctg_tbl)) return(character(0))
+    bin_id_stripped <- sub("\\.fa(\\.sub)?\\.contigs$", "", bin_name)
+    bin_id_col <- as.character(ctg_tbl[["Bin ID"]])
+    bin_contigs <- rownames(ctg_tbl)[bin_id_col == bin_name]
+    if (length(bin_contigs) == 0)
+      bin_contigs <- rownames(ctg_tbl)[bin_id_col == bin_id_stripped]
+    if (length(bin_contigs) == 0) return(character(0))
+    contig_col <- "Contig ID"
+    ko_col     <- "KEGG ID"
+    if (!contig_col %in% colnames(orf_tbl) || !ko_col %in% colnames(orf_tbl))
+      return(character(0))
+    rows <- orf_tbl[as.character(orf_tbl[[contig_col]]) %in% bin_contigs, ]
+    kos  <- as.character(rows[[ko_col]])
+    kos  <- unique(kos[nzchar(kos) & !is.na(kos) & kos != "-"])
+    kos
+  }
+
+  # ---- Category → KEGG L2 mapping (matching the BacMet diagram categories) --
+  # Each entry maps the diagram box label to a vector of KEGG L2 category names.
+  # Multiple L2 names are combined (OR) so we get all relevant KOs.
+  MAG_MAP_CATEGORIES <- list(
+    # Central Carbon Metabolism
+    "Glycolysis"                   = list(rect=c(0.040, 0.100, 0.175, 0.215), kegg_l2=c("Glycolysis / Gluconeogenesis")),
+    "Pentose Phosphate Pathway"    = list(rect=c(0.040, 0.220, 0.175, 0.330), kegg_l2=c("Pentose phosphate pathway")),
+    "Entner-Doudoroff Pathway"     = list(rect=c(0.040, 0.335, 0.175, 0.435), kegg_l2=c("Pentose phosphate pathway", "Glycolysis / Gluconeogenesis")),
+    "TCA Cycle"                    = list(rect=c(0.280, 0.165, 0.430, 0.390), kegg_l2=c("Citrate cycle (TCA cycle)")),
+    "CO2 Fixation"                 = list(rect=c(0.440, 0.100, 0.575, 0.215), kegg_l2=c("Carbon fixation pathways in prokaryotes", "Carbon fixation in photosynthetic organisms")),
+    "Fermentation"                 = list(rect=c(0.440, 0.320, 0.575, 0.435), kegg_l2=c("C5-Branched dibasic acid metabolism", "Butanoate metabolism", "Propanoate metabolism")),
+    # Nitrogen & Sulfur Metabolism
+    "Nitrogen Fixation"            = list(rect=c(0.600, 0.095, 0.740, 0.185), kegg_l2=c("Nitrogen metabolism")),
+    "Assimilatory N"               = list(rect=c(0.760, 0.095, 0.960, 0.185), kegg_l2=c("Nitrogen metabolism")),
+    "Denitrification"              = list(rect=c(0.600, 0.195, 0.740, 0.285), kegg_l2=c("Nitrogen metabolism")),
+    "Sulfur Cycle"                 = list(rect=c(0.760, 0.195, 0.960, 0.285), kegg_l2=c("Sulfur metabolism")),
+    "Nitrification"                = list(rect=c(0.600, 0.295, 0.740, 0.375), kegg_l2=c("Nitrogen metabolism")),
+    # Biosynthesis / Anabolism
+    "Amino Acids"                  = list(rect=c(0.040, 0.520, 0.195, 0.590), kegg_l2=c("Alanine, aspartate and glutamate metabolism","Glycine, serine and threonine metabolism","Cysteine and methionine metabolism","Valine, leucine and isoleucine biosynthesis","Lysine biosynthesis","Arginine biosynthesis","Histidine metabolism","Phenylalanine, tyrosine and tryptophan biosynthesis")),
+    "Nucleotides"                  = list(rect=c(0.220, 0.520, 0.380, 0.590), kegg_l2=c("Purine metabolism","Pyrimidine metabolism")),
+    "Vitamins / Cofactors"         = list(rect=c(0.395, 0.500, 0.555, 0.615), kegg_l2=c("Metabolism of cofactors and vitamins","Thiamine metabolism","Riboflavin metabolism","Vitamin B6 metabolism","Nicotinate and nicotinamide metabolism","Pantothenate and CoA biosynthesis","Biotin metabolism","Lipoic acid metabolism","Folate biosynthesis","One carbon pool by folate","Retinol metabolism","Porphyrin metabolism","Ubiquinone and other terpenoid-quinone biosynthesis")),
+    "Fatty Acids"                  = list(rect=c(0.040, 0.615, 0.195, 0.685), kegg_l2=c("Fatty acid biosynthesis","Fatty acid elongation","Fatty acid degradation")),
+    "Cell Wall"                    = list(rect=c(0.220, 0.615, 0.380, 0.685), kegg_l2=c("Peptidoglycan biosynthesis and degradation enzymes","Lipopolysaccharide biosynthesis","Lipoteichoic acid biosynthesis")),
+    # Respiration / Energy
+    "ETC"                          = list(rect=c(0.600, 0.510, 0.760, 0.600), kegg_l2=c("Oxidative phosphorylation")),
+    "ATP Synthase"                 = list(rect=c(0.775, 0.510, 0.960, 0.600), kegg_l2=c("Oxidative phosphorylation")),
+    "Oxidative Phosphorylation"    = list(rect=c(0.600, 0.610, 0.760, 0.690), kegg_l2=c("Oxidative phosphorylation")),
+    "Anaerobic Respiration"        = list(rect=c(0.775, 0.610, 0.960, 0.690), kegg_l2=c("Nitrogen metabolism","Sulfur metabolism")),
+    # Transporters / Systems
+    "ABC Transporters"             = list(rect=c(0.040, 0.760, 0.175, 0.840), kegg_l2=c("ABC transporters")),
+    "Sec / Tat Systems"            = list(rect=c(0.185, 0.760, 0.320, 0.840), kegg_l2=c("Protein export")),
+    "Efflux Pumps"                 = list(rect=c(0.330, 0.760, 0.460, 0.840), kegg_l2=c("Transporters")),
+    "Motility"                     = list(rect=c(0.470, 0.760, 0.575, 0.840), kegg_l2=c("Flagellar assembly","Bacterial motility proteins")),
+    "CRISPR"                       = list(rect=c(0.585, 0.760, 0.740, 0.840), kegg_l2=c("Replication and repair")),
+    "Stress Response"              = list(rect=c(0.750, 0.760, 0.960, 0.840), kegg_l2=c("Prokaryotic defense system"))
+  )
+
+  magmap_selected_bin <- reactiveVal(NULL)
+
+  # Reactive: compute completeness per category for selected MAG
+  magmap_completeness <- reactive({
+    proj <- sqm_data(); req(proj)
+    bin  <- magmap_selected_bin(); req(bin)
+    kos  <- tryCatch(get_bin_kos(proj, bin), error = function(e) character(0))
+    kcat <- KEGG_CATEGORIES  # loaded in global.R
+
+    lapply(MAG_MAP_CATEGORIES, function(cat_info) {
+      l2_names  <- cat_info$kegg_l2
+      # All KOs annotated to these L2 categories
+      if (!is.null(kcat)) {
+        cat_kos <- unique(kcat$id[kcat$l2 %in% l2_names])
+        cat_kos <- cat_kos[nzchar(cat_kos) & !is.na(cat_kos)]
+      } else {
+        cat_kos <- character(0)
+      }
+      if (length(cat_kos) == 0) return(list(pct = NA_real_, present = 0, total = 0))
+      present <- sum(cat_kos %in% kos)
+      list(pct = round(100 * present / length(cat_kos), 1),
+           present = present, total = length(cat_kos))
+    })
+  })
+
+  # ---- MAG selector UI
+  output$magmap_bin_select_ui <- renderUI({
+    proj <- sqm_data()
+    if (is.null(proj)) {
+      return(tags$div(style = "font-size:0.8rem; color:var(--muted);",
+        "Load a SQM project with binning first."))
+    }
+    bins <- tryCatch(rownames(proj$bins$table), error = function(e) NULL)
+    if (is.null(bins) || length(bins) == 0) {
+      return(tags$div(style = "font-size:0.8rem; color:var(--muted);",
+        "No MAGs found in this project."))
+    }
+    selectInput("magmap_bin", NULL, choices = c("— select a MAG —" = "", bins))
+  })
+
+  observeEvent(input$magmap_bin, {
+    v <- input$magmap_bin
+    magmap_selected_bin(if (nzchar(v)) v else NULL)
+  })
+
+  # ---- Info panel in sidebar
+  output$magmap_selected_ui <- renderUI({
+    bin <- magmap_selected_bin()
+    if (is.null(bin))
+      return(tags$div(style = "font-size:0.8rem; color:var(--muted);",
+        "Select a MAG above to see completeness overlay."))
+    proj <- sqm_data()
+    kos <- tryCatch(get_bin_kos(proj, bin), error = function(e) character(0))
+    tags$div(
+      tags$div(class = "form-label", "Selected MAG"),
+      tags$div(style = "font-size:0.82rem; word-break:break-all; font-weight:600;", bin),
+      tags$div(style = "font-size:0.78rem; color:var(--muted); margin-top:4px;",
+        paste0(length(kos), " unique KEGG KOs"))
+    )
+  })
+
+  # ---- Main view: image + SVG overlay
+  output$magmap_view_ui <- renderUI({
+    proj <- sqm_data()
+
+    # BacMet diagram PNG — try www/ first (Shiny static serving), then base64 fallback
+    img_src <- "BacMet.png"  # Shiny serves www/ folder at root
+    www_path <- file.path(app_dir, "www", "BacMet.png")
+    root_path <- file.path(app_dir, "BacMet.png")
+
+    if (!file.exists(www_path) && !file.exists(root_path)) {
+      return(tags$div(style = "padding:2rem; color:var(--muted);",
+        "BacMet.png not found. Place it in the app's www/ folder or the app directory."))
+    }
+
+    # If not in www/, encode inline as base64
+    if (!file.exists(www_path) && file.exists(root_path)) {
+      if (requireNamespace("base64enc", quietly = TRUE)) {
+        img_b64 <- base64enc::base64encode(root_path)
+        img_src  <- paste0("data:image/png;base64,", img_b64)
+      } else {
+        # Copy to www/
+        dir.create(file.path(app_dir, "www"), showWarnings = FALSE)
+        file.copy(root_path, www_path)
+        img_src <- "BacMet.png"
+      }
+    }
+
+    bin  <- magmap_selected_bin()
+    comp <- if (!is.null(bin) && !is.null(proj)) {
+      tryCatch(magmap_completeness(), error = function(e) NULL)
+    } else NULL
+
+    # Build SVG overlay rectangles
+    rects_svg <- ""
+    if (!is.null(comp)) {
+      rects_svg <- paste(mapply(function(cat_name, cat_info, cat_comp) {
+        r    <- cat_info$rect   # [x0, y0, x1, y1] as fractions of image
+        pct  <- cat_comp$pct
+        pres <- cat_comp$present
+        tot  <- cat_comp$total
+        opacity <- if (is.na(pct)) 0.08 else 0.05 + 0.70 * (pct / 100)
+        label_pct <- if (is.na(pct)) "N/A" else paste0(pct, "%")
+        tooltip   <- paste0(cat_name, ": ", label_pct,
+                            " (", pres, "/", tot, " KOs)")
+        sprintf(
+          '<rect class="magmap-cat" x="%.4f%%" y="%.4f%%" width="%.4f%%" height="%.4f%%"
+            fill="rgba(200,30,30,%.3f)" stroke="rgba(180,20,20,0.55)" stroke-width="1.5"
+            rx="4" ry="4" data-tip="%s"/>\n',
+          r[1]*100, r[2]*100, (r[3]-r[1])*100, (r[4]-r[2])*100,
+          opacity, htmltools::htmlEscape(tooltip, attribute=TRUE))
+      }, names(MAG_MAP_CATEGORIES), MAG_MAP_CATEGORIES, comp), collapse="")
+    }
+
+    # Tooltip div + JS
+    tooltip_js <- "
+      (function() {
+        var tip = document.getElementById('magmap-tooltip');
+        if (!tip) {
+          tip = document.createElement('div');
+          tip.id = 'magmap-tooltip';
+          tip.style.cssText = 'position:fixed;pointer-events:none;display:none;' +
+            'background:rgba(30,30,30,0.88);color:#fff;font-size:0.82rem;' +
+            'padding:5px 10px;border-radius:5px;z-index:9999;white-space:nowrap;' +
+            'box-shadow:0 2px 8px rgba(0,0,0,0.35);';
+          document.body.appendChild(tip);
+        }
+        var svg = document.getElementById('magmap-svg-overlay');
+        if (!svg) return;
+        svg.querySelectorAll('.magmap-cat').forEach(function(r) {
+          r.style.cursor = 'pointer';
+          r.addEventListener('mouseenter', function(e) {
+            tip.textContent = r.getAttribute('data-tip');
+            tip.style.display = 'block';
+          });
+          r.addEventListener('mousemove', function(e) {
+            tip.style.left = (e.clientX + 14) + 'px';
+            tip.style.top  = (e.clientY - 28) + 'px';
+          });
+          r.addEventListener('mouseleave', function() {
+            tip.style.display = 'none';
+          });
+        });
+      })();
+    "
+
+    tagList(
+      tags$div(
+        style = "position:relative; display:inline-block; width:100%; max-width:100%;",
+        tags$img(
+          src   = img_src,
+          style = "width:100%; height:auto; display:block;",
+          alt   = "Metabolic diagram"
+        ),
+        tags$svg(
+          id     = "magmap-svg-overlay",
+          xmlns  = "http://www.w3.org/2000/svg",
+          style  = "position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:auto;",
+          HTML(rects_svg)
+        )
+      ),
+      tags$script(HTML(tooltip_js))
+    )
+  })
+
+  # ---- Re-use get_bin_kos helper from above (defined in this same server scope)
+  # (already defined as get_bin_kos() in the original code — kept intact)
 
 
 
