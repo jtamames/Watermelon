@@ -8,7 +8,7 @@ server <- function(input, output, session) {
   creator_name <- reactiveVal(NULL)
   is_sqm_full  <- reactiveVal(FALSE)
 
-  ANALYSIS_TABS <- c("Plots", "Tables", "Krona", "Pathways", "Multivariate", "Comparison")
+  ANALYSIS_TABS <- c("Plots", "Tables", "Pathways", "Multivariate", "Comparison")
 
 
   # ── Dynamic plot type selector ──
@@ -37,7 +37,7 @@ server <- function(input, output, session) {
     proj <- sqm_data()
     cat  <- input$plot_category %||% "taxonomy"
     choices <- if (cat == "taxonomy") {
-      c("Barplot" = "taxonomy_bar", "Heatmap" = "taxonomy_heatmap")
+      c("Barplot" = "taxonomy_bar", "Heatmap" = "taxonomy_heatmap", "Krona" = "krona")
     } else if (cat == "functions") {
       ch <- c()
       if (!is.null(proj)) {
@@ -846,6 +846,19 @@ server <- function(input, output, session) {
   output$plot_controls_ui <- renderUI({
     pt <- input$plot_type; if (is.null(pt)) return(NULL)
     rank_choices <- c("Phylum"="phylum","Class"="class","Order"="order","Family"="family","Genus"="genus","Species"="species")
+    if (pt == "krona") {
+      return(tagList(
+        tags$div(class="sidebar-box",
+          tags$div(class="form-label", "Krona chart"),
+          if (!kt_available())
+            tags$div(style="font-size:0.8rem; color:#c0392b;",
+              "ktImportText not found. Install KronaTools and add it to PATH.")
+          else
+            actionButton("do_krona_inline", "Generate Krona",
+              class = "btn-primary w-100")
+        )
+      ))
+    }
     if (pt == "taxonomy_bar") {
       tax_counts <- if (!is.null(sqm_data())) available_tax_counts(sqm_data()) else c("Percentage (percent)"="percent")
       avail_ranks <- if (!is.null(sqm_data())) available_tax_ranks(sqm_data()) else rank_choices
@@ -1044,6 +1057,8 @@ server <- function(input, output, session) {
     } else if (is_tax) {
       tags$div(style="width:100%; overflow-x:auto;",
         plotlyOutput("sqm_tax_plot", width="100%", height=paste0(h,"px")))
+    } else if (!is.null(pt) && pt == "krona") {
+      uiOutput("sqm_krona_inline_ui")
     } else {
       tags$div(style=style,
         plotOutput("sqm_plot", width=if(!is.null(w)) paste0(w,"px") else "100%", height=paste0(h,"px")))
@@ -1942,6 +1957,37 @@ server <- function(input, output, session) {
       else { krona_status("error"); showNotification("Krona file was not generated.",type="error",duration=8) }
     }, error=function(e) { krona_status("error"); showNotification(paste("Krona error:",e$message),type="error",duration=10) })
   })
+  # Krona inline in Plots tab
+  output$sqm_krona_inline_ui <- renderUI({
+    kf <- krona_file(); req(kf, file.exists(kf))
+    tags$iframe(src = session$fileUrl("krona_inline", kf, contentType = "text/html"),
+      width = "100%", height = "600px", frameborder = "0")
+  })
+
+  output$krona_inline <- downloadHandler(
+    filename = "krona.html",
+    content  = function(file) { kf <- krona_file(); file.copy(kf, file) }
+  )
+
+  observeEvent(input$do_krona_inline, {
+    req(sqm_data()); req(kt_available())
+    krona_status("generating"); krona_file(NULL)
+    tryCatch({
+      proj     <- sqm_data()
+      sel_smp  <- input$plot_samples
+      all_smp  <- proj$misc$samples
+      if (!is.null(sel_smp) && length(sel_smp) > 0 && !setequal(sel_smp, all_smp))
+        proj <- tryCatch(subsetSamples(proj, sel_smp), error = function(e) proj)
+      out_file <- tempfile(fileext = ".html")
+      exportKrona(proj, output_name = out_file)
+      if (file.exists(out_file)) { krona_file(out_file); krona_status("ready") }
+      else { krona_status("error"); showNotification("Krona file not generated.", type="error") }
+    }, error = function(e) {
+      krona_status("error")
+      showNotification(paste("Krona error:", e$message), type="error", duration=10)
+    })
+  })
+
   output$krona_status_ui <- renderUI({
     s <- krona_status()
     col <- switch(s,idle="#7a90a8",generating="#3b9ede",ready="#1a9e6e",error="#c0392b")

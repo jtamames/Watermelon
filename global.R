@@ -474,7 +474,6 @@ table.dataTable tbody tr:hover { background: #eef5fc !important; }
    removed by the server once a project is ready) */
 body.sqm-no-project [data-value='Plots'],
 body.sqm-no-project [data-value='Tables'],
-body.sqm-no-project [data-value='Krona'],
 body.sqm-no-project [data-value='Pathways'],
 body.sqm-no-project [data-value='Multivariate'],
 body.sqm-no-project [data-value='Comparison'] { display: none !important; }

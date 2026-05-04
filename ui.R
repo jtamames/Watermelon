@@ -269,25 +269,6 @@ nav_panel("Load",
         uiOutput("tbl_main_ui")))
     )
   ),
-  nav_panel("Krona",
-    layout_sidebar(
-      sidebar = sidebar(width = 250,
-        uiOutput("krona_ktcheck_ui"),
-        tags$hr(class = "section-divider"),
-        tags$div(class = "form-label mt-1", "Filter samples"),
-        uiOutput("krona_sample_filter_ui"),
-        tags$hr(class = "section-divider"),
-        actionButton("do_krona", "Generate Krona", class = "btn-primary w-100 mt-1"),
-        tags$div(style = "margin-top:5px;", uiOutput("krona_download_ui")),
-        tags$div(style = "margin-top:10px;", uiOutput("krona_status_ui"))
-      ),
-      card(
-        card_header(div(style = "display:flex; justify-content:space-between; align-items:center;",
-          span("Krona Chart"), uiOutput("krona_badge_ui"))),
-        card_body(class = "p-0", uiOutput("krona_view_ui"))
-      )
-    )
-  ),
   nav_panel("Pathways",
     layout_sidebar(
       sidebar = sidebar(width = 270,
