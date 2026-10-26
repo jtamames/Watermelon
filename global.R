@@ -2000,8 +2000,7 @@ run_squeezemeta <- function(program,
                             no_bins             = FALSE,
                             only_bins           = FALSE,
                             binners             = NULL,
-                            lowmem              = FALSE,
-                            diamond_block       = NA) {
+                            lowmem              = FALSE) {
 
   if (!requireNamespace("processx", quietly = TRUE))
     stop("Package 'processx' is required. Install it with install.packages('processx').")
@@ -2049,13 +2048,8 @@ run_squeezemeta <- function(program,
       args <- c(args, "-map", mapper)
     if (nzchar(mapping_options))
       args <- c(args, "-mapping_options", mapping_options)
-    # Taxonomic consensus for bins (-consensus). NOTE: -b is Diamond block size.
     if (!is.null(consensus) && !is.na(consensus))
-      args <- c(args, "-consensus", as.character(consensus))
-    # Diamond block size (-b). Lower values = less RAM.
-    if (!is.null(diamond_block) && !is.na(diamond_block) &&
-        as.numeric(diamond_block) > 0)
-      args <- c(args, "-b", as.character(diamond_block))
+      args <- c(args, "-b", as.character(consensus))
     if (isTRUE(no_bins))    args <- c(args, "--nobins")
     if (isTRUE(only_bins))  args <- c(args, "--onlybins")
     if (!is.null(binners) && length(binners) > 0 && any(nzchar(binners)))
@@ -2101,3 +2095,15 @@ run_squeezemeta <- function(program,
     command = cmd_str
   )
 }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# KEGG module definitions and evaluator for module-based MAG completeness.
+# Loaded last so KEGG_MODULES, MAG_MAP_CATEGORY_MODULES and evaluate_module()
+# are available to server_magmap.R.
+# ─────────────────────────────────────────────────────────────────────────────
+local({
+  mod_file <- file.path(app_dir, "kegg_modules.R")
+  if (file.exists(mod_file)) sys.source(mod_file, envir = globalenv())
+  else warning("kegg_modules.R not found at ", mod_file,
+               " — the 'Modules' completeness mode will fall back to Central.")
+})

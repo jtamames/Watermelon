@@ -120,15 +120,6 @@ ui <- page_navbar(
             accordion_panel("Performance",
               numericInput("lnch_threads", "Threads", 8, min = 1),
               conditionalPanel(condition = "input.lnch_program == 'SqueezeMeta.pl'",
-                checkboxInput("lnch_auto_block",
-                  "Self-calculate Diamond block size",
-                  TRUE),
-                conditionalPanel(
-                  condition = "input.lnch_auto_block == false",
-                  numericInput("lnch_diamond_block",
-                    "Diamond block size (-b)",
-                    value = NA, min = 1, step = 1)
-                ),
                 checkboxInput("lnch_lowmem",
                   "Low memory mode (--lowmem)",
                   FALSE)
@@ -485,11 +476,11 @@ nav_panel("Load",
             uiOutput("magmap_bin_select_ui")
           ),
           tags$div(class = "sidebar-box",
-            help_label("KO list",
-              "Extended: all KOs in the KEGG pathways assigned to each category. Central: curated set of diagnostic / canonical KOs for each pathway."),
+            help_label("Completeness mode",
+              "Modules (recommended): KEGG module step completeness — counts reaction steps covered, so one isoenzyme per step gives 100%. Extended: all KOs in the KEGG pathways (biased low by alternative/variant genes). Central: curated set of diagnostic KOs."),
             radioButtons("magmap_ko_mode", NULL,
-              choices = c("Extended" = "extended", "Central" = "central"),
-              selected = "extended", inline = TRUE)
+              choices = c("Modules" = "modules", "Extended" = "extended", "Central" = "central"),
+              selected = "modules", inline = TRUE)
           ),
           tags$hr(class = "section-divider"),
           uiOutput("magmap_selected_ui")

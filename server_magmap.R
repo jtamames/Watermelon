@@ -350,27 +350,84 @@
       if (!is.null(CORE_KOS[[key]])) CORE_KOS[[key]] else character(0)
   }
 
-  # Helper: given a category and the active mode ("extended" or "central"),
-  # return the active KO list.
+  # Helper: given a category and the active mode ("extended"/"central"/"modules"),
+  # return the active KO list. 'modules' is handled separately below (not via
+  # this helper), but for safety it falls back to the Central set.
   magmap_active_kos <- function(cat_info, mode) {
-    if (identical(mode, "central")) cat_info$kos_central else cat_info$kos_extended
+    if (identical(mode, "central") || identical(mode, "modules"))
+      cat_info$kos_central
+    else cat_info$kos_extended
   }
 
   magmap_selected_bin <- reactiveVal(NULL)
 
-  # Completeness: present KOs / curated KO list size * 100
+  # Completeness: three modes.
+  #   extended / central → fraction of KOs in the (extended|central) list that
+  #                        are present in the MAG (naive KO coverage).
+  #   modules            → KEGG-module step completeness. For each category we
+  #                        evaluate every associated module against the MAG's
+  #                        KOs, then AGGREGATE by taking the MAXIMUM module
+  #                        completeness (a MAG typically uses one alternative
+  #                        pathway, not all). We also keep the full per-module
+  #                        breakdown in $modules for the tooltip.
+  # Categories without a module list fall back to Central-KO coverage.
   magmap_completeness <- reactive({
     proj    <- sqm_data(); req(proj)
     bin     <- magmap_selected_bin(); req(bin)
-    mode    <- input$magmap_ko_mode %||% "extended"
+    mode    <- input$magmap_ko_mode %||% "modules"
     mag_kos <- tryCatch(get_bin_kos(proj, bin), error = function(e) character(0))
-    lapply(MAG_MAP_CATEGORIES, function(cat_info) {
+
+    modules_available <- exists("KEGG_MODULES") && exists("MAG_MAP_CATEGORY_MODULES") &&
+                         exists("evaluate_module") && exists("get_module")
+
+    lapply(setNames(names(MAG_MAP_CATEGORIES), names(MAG_MAP_CATEGORIES)),
+    function(cn) {
+      cat_info <- MAG_MAP_CATEGORIES[[cn]]
+      if (identical(mode, "modules") && modules_available) {
+        mod_key <- gsub("[\n[:space:]]+", " ", cn, perl = TRUE)
+        mids    <- MAG_MAP_CATEGORY_MODULES[[mod_key]]
+        if (!is.null(mids) && length(mids) > 0) {
+          mod_results <- lapply(mids, function(mid) {
+            m <- get_module(mid)
+            if (is.null(m)) return(NULL)
+            ev <- evaluate_module(m$definition, mag_kos)
+            list(id = mid, name = m$name,
+                 pct = ev$pct, present = ev$present, total = ev$total)
+          })
+          mod_results <- Filter(Negate(is.null), mod_results)
+          if (length(mod_results) > 0) {
+            pcts <- vapply(mod_results, function(x) x$pct, numeric(1))
+            pcts <- pcts[!is.na(pcts)]
+            # Aggregation = MAX across modules (a MAG uses one alternative route)
+            pct <- if (length(pcts) == 0) NA_real_ else round(max(pcts), 1)
+            # Pick the best module to report present/total
+            best_idx <- if (length(pcts) == 0) NA_integer_
+                        else which.max(vapply(mod_results, function(x)
+                          if (is.na(x$pct)) -1 else x$pct, numeric(1)))
+            best <- if (!is.na(best_idx)) mod_results[[best_idx]] else list(present=0L, total=0L)
+            return(list(pct = pct, present = best$present, total = best$total,
+                        modules = mod_results, mode = "modules"))
+          }
+        }
+        # Fallback: no modules for this category → Central-KO coverage
+        cat_kos <- unique(cat_info$kos_central)
+        if (length(cat_kos) == 0)
+          return(list(pct = NA_real_, present = 0L, total = 0L, modules = NULL,
+                      mode = "central-fallback"))
+        present <- sum(cat_kos %in% mag_kos)
+        return(list(pct = round(100 * present / length(cat_kos), 1),
+                    present = present, total = length(cat_kos),
+                    modules = NULL, mode = "central-fallback"))
+      }
+      # Extended / Central mode
       cat_kos <- unique(magmap_active_kos(cat_info, mode))
-      if (length(cat_kos) == 0) return(list(pct = NA_real_, present = 0L, total = 0L))
+      if (length(cat_kos) == 0)
+        return(list(pct = NA_real_, present = 0L, total = 0L,
+                    modules = NULL, mode = mode))
       present <- sum(cat_kos %in% mag_kos)
-      list(pct     = round(100 * present / length(cat_kos), 1),
-           present = present,
-           total   = length(cat_kos))
+      list(pct = round(100 * present / length(cat_kos), 1),
+           present = present, total = length(cat_kos),
+           modules = NULL, mode = mode)
     })
   })
 
@@ -867,10 +924,28 @@
         fill_col <- "220,40,40"   # red overlay for all bars
 
         label    <- if (is.na(pct)) "N/A" else paste0(round(pct), "%")
-        tip      <- htmltools::htmlEscape(
-                      paste0(gsub("\n", " ", cat_name), "\n",
-                             label, "  (", pres, "/", tot, " KOs)"),
-                      attribute = TRUE)
+        # Build the tooltip. In Modules mode we append the per-module breakdown
+        # (id, pct) so users can see which alternative pathway is covered.
+        tip_lines <- c(gsub("\n", " ", cat_name))
+        if (identical(cat_comp$mode, "modules") && !is.null(cat_comp$modules) &&
+            length(cat_comp$modules) > 0) {
+          tip_lines <- c(tip_lines,
+                         paste0(label, "  (best module)"),
+                         "---")
+          for (m in cat_comp$modules) {
+            mp <- if (is.na(m$pct)) "N/A" else paste0(round(m$pct), "%")
+            tip_lines <- c(tip_lines,
+              paste0(m$id, ": ", m$name, "  (", mp, ", ", m$present, "/", m$total, " steps)"))
+          }
+        } else if (identical(cat_comp$mode, "central-fallback")) {
+          tip_lines <- c(tip_lines,
+                         paste0(label, "  (", pres, "/", tot, " KOs, no modules — Central fallback)"))
+        } else {
+          tip_lines <- c(tip_lines,
+                         paste0(label, "  (", pres, "/", tot, " KOs)"))
+        }
+        tip <- htmltools::htmlEscape(paste(tip_lines, collapse = "\n"),
+                                     attribute = TRUE)
 
         # Coordinates in viewBox [0,100] units
         x0 <- r[1] * 100; y0 <- r[2] * 100
